@@ -64,8 +64,12 @@ export default async (req, context) => {
 
     // blocked in the admin panel (admin.mjs): this PC can't list games
     const from = String(context.ip ?? "");
-    const blocked = (await getStore({ name: "admin", consistency: "strong" }).get("blocked", { type: "json" })) || { ips: [] };
+    const admin = getStore({ name: "admin", consistency: "strong" });
+    const blocked = (await admin.get("blocked", { type: "json" })) || { ips: [] };
     if (from && blocked.ips.some((x) => x.ip === from)) return json({ error: "This PC can't host Nox games." }, 403);
+    // taken off the list in the admin panel: this hosting session stays off (a new one can list again)
+    const removed = (await admin.get("removed", { type: "json" })) || {};
+    if (b.token && removed[clean(b.token, 40)]) return json({ error: "This game was taken off the list." }, 410);
 
     let code = clean(b.code, 6).toUpperCase();
     let token = clean(b.token, 40);

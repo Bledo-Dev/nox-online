@@ -33,6 +33,15 @@ const json = (data, status = 200) =>
 
 const env = (k) => (globalThis.Netlify?.env?.get?.(k) ?? process.env[k] ?? "");
 const hash = (s) => createHash("sha256").update(String(s)).digest("hex");
+// a game taken off the list stays off: its hosting session (token) is refused when it checks in
+async function remember (admin, tokens) {
+  const removed = (await admin.get("removed", { type: "json" })) || {};
+  const now = Date.now();
+  for (const t of Object.keys(removed)) if (now - removed[t] > 24 * 60 * 60 * 1000) delete removed[t];   // (a day is plenty)
+  for (const t of tokens) if (t) removed[t] = now;
+  await admin.setJSON("removed", removed);
+}
+
 const same = (a, b) => {   // (compares without giving away how much matched)
   const x = Buffer.from(hash(a)), y = Buffer.from(hash(b));
   return timingSafeEqual(x, y);
@@ -118,12 +127,21 @@ export default async (req, context) => {
   }
 
   if (what === "delete" && req.method === "POST") {
-    await games.delete(String(b.code || "").toUpperCase());
+    const code = String(b.code || "").toUpperCase();
+    const g = await games.get(code, { type: "json" });
+    if (g) await remember(admin, [g.token]);
+    await games.delete(code);
     return json({ ok: true });
   }
 
   if (what === "clear" && req.method === "POST") {
     const { blobs } = await games.list();
+    const tokens = [];
+    for (const { key } of blobs) {
+      const g = await games.get(key, { type: "json" });
+      if (g) tokens.push(g.token);
+    }
+    await remember(admin, tokens);
     for (const { key } of blobs) await games.delete(key);
     return json({ ok: true, removed: blobs.length });
   }
