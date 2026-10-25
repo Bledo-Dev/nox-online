@@ -1,0 +1,7 @@
+# Nox online. The functions are in netlify/functions; there's no website to build.
+[build]
+  publish = "public"
+  command = ""
+
+[functions]
+  directory = "netlify/functions"

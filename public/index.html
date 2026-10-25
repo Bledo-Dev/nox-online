@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nox</title>
+<style>body{font-family:system-ui,sans-serif;background:#1c1c1f;color:#ddd;max-width:640px;margin:60px auto;padding:0 16px}
+h1{color:#fff}a{color:#56a0d6}code{background:#2a2a30;padding:2px 6px}</style></head>
+<body><h1>Nox</h1>
+<p>This is where the Nox app looks up games that are being hosted. Get the Nox app and press Play.</p>
+<p>Games online right now: <span id="n">...</span></p>
+<script>fetch('/api/games').then(r=>r.json()).then(d=>{document.getElementById('n').textContent=d.games.length}).catch(()=>{document.getElementById('n').textContent='?'})</script>
+</body></html>
