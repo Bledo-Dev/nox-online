@@ -4,7 +4,9 @@
 // "this code = this game, at this address" for a few minutes at a time.
 //
 //   POST /api/host    a host checks in (every 2 minutes while hosting)
-//                     { name, game, players, max, port, ip?, token?, code?, stop? }
+//                     { name, game, players, max, port, ip?, url?, token?, code?, stop? }
+//                     (url: a host that can't let players in directly comes through
+//                      Cloudflare's tunnel, wss://....trycloudflare.com)
 //                     -> { code, token, ip, port }
 //   GET  /api/games   the games checked in during the last 5 minutes
 //   GET  /api/code?c=ABC123   one game, by its code
@@ -31,8 +33,9 @@ const newToken = () => Array.from({ length: 24 }, () => ALPHA[Math.floor(Math.ra
 // what people see of a game (never the host's token)
 const pub = (g) => ({
   code: g.code, game: g.game, host: g.name, players: g.players, max: g.max,
-  ip: g.ip, port: g.port, version: g.version,
+  ip: g.ip, port: g.port, url: g.url || "", version: g.version,
 });
+const isTunnel = (s) => /^wss:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(s);
 
 export default async (req, context) => {
   const store = getStore("games");
@@ -51,9 +54,10 @@ export default async (req, context) => {
     }
 
     // the address others reach it at: what its router said (UPnP), else where this request came from
-    const ip = isIPv4(String(b.ip ?? "")) ? String(b.ip) : isIPv4(context.ip ?? "") ? context.ip : "";
+    const url = isTunnel(String(b.url ?? "")) ? String(b.url) : "";
+    const ip = url ? "" : isIPv4(String(b.ip ?? "")) ? String(b.ip) : isIPv4(context.ip ?? "") ? context.ip : "";
     const port = Number(b.port) | 0;
-    if (!ip) return json({ error: "Your internet address couldn't be found (IPv6 only?)." }, 400);
+    if (!ip && !url) return json({ error: "Your internet address couldn't be found (IPv6 only?)." }, 400);
     if (port < 1 || port > 65535) return json({ error: "bad port" }, 400);
 
     let code = clean(b.code, 6).toUpperCase();
@@ -71,7 +75,7 @@ export default async (req, context) => {
       token = newToken();
     }
     const game = {
-      code, token, ip, port,
+      code, token, ip, port, url,
       name: clean(b.name, 24) || "Someone",
       game: clean(b.game, 48) || "A Nox game",
       players: Math.max(0, Math.min(99, Number(b.players) | 0)),
@@ -80,7 +84,7 @@ export default async (req, context) => {
       updated: Date.now(),
     };
     await store.setJSON(code, game);
-    return json({ code, token, ip, port });
+    return json({ code, token, ip, port, url });
   }
 
   if (req.method === "GET" && path.endsWith("/games")) {
