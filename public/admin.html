@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Nox admin</title>
+<style>
+body{font-family:system-ui,sans-serif;background:#1c1c1f;color:#ddd;max-width:900px;margin:40px auto;padding:0 16px}
+h1{color:#fff;margin-bottom:4px}h2{color:#fff;font-size:18px;margin-top:32px}
+.dim{color:#999}.err{color:#e98a72;min-height:20px}
+input{background:#2a2a30;color:#fff;border:1px solid #444;padding:8px 10px;font-size:15px;width:240px;display:block;margin:6px 0 12px}
+button{background:#2f2f36;color:#fff;border:1px solid #555;padding:7px 14px;font-size:14px;cursor:pointer}
+button:hover{background:#3a3a42}button.go{background:#38804a;border-color:#38804a}button.bad{background:#7a2e2a;border-color:#7a2e2a}
+table{border-collapse:collapse;width:100%;margin-top:10px;font-size:14px}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid #333;vertical-align:top}th{color:#999;font-weight:normal}
+td button{padding:4px 10px;margin-right:4px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.hide{display:none}code{background:#2a2a30;padding:1px 5px}
+@media (max-width:640px){.wide{display:none}}
+</style></head>
+<body>
+<h1>Nox admin</h1>
+<p class="dim">Take games off the list, and stop a PC from listing games.</p>
+
+<div id="login">
+  <label>Username<input id="user" autocomplete="username"></label>
+  <label>Password<input id="pass" type="password" autocomplete="current-password"></label>
+  <button class="go" id="loginBtn">Sign in</button>
+  <p class="err" id="loginErr"></p>
+</div>
+
+<div id="verify" class="hide">
+  <p>A 6-digit code was sent to your email. It works for 10 minutes.</p>
+  <label>Code<input id="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code"></label>
+  <button class="go" id="verifyBtn">Continue</button>
+  <p class="err" id="verifyErr"></p>
+</div>
+
+<div id="panel" class="hide">
+  <div class="bar">
+    <button id="refresh">Refresh</button>
+    <button class="bad" id="clear">Delete all games</button>
+    <span style="flex:1"></span>
+    <button id="logout">Sign out</button>
+  </div>
+  <p class="err" id="panelErr"></p>
+  <h2>Games listed <span class="dim" id="count"></span></h2>
+  <table><thead><tr><th>Game</th><th>Host</th><th>Players</th><th>Code</th><th class="wide">Started</th><th></th></tr></thead>
+  <tbody id="games"></tbody></table>
+  <h2>Blocked PCs</h2>
+  <p class="dim">A blocked PC can't list games. It's matched by its internet address, so someone who changes networks gets around it, and on shared internet (like T-Mobile Home Internet) it can block others on the same address.</p>
+  <table><thead><tr><th>Address</th><th>Was hosting</th><th class="wide">Note</th><th class="wide">When</th><th></th></tr></thead>
+  <tbody id="blocked"></tbody></table>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let token = "", pending = "";
+try { token = sessionStorage.getItem("noxAdmin") || ""; } catch (e) {}
+
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const ago = (t) => { if (!t) return ""; const m = Math.round((Date.now() - t) / 60000); return m < 1 ? "just now" : m < 60 ? m + " min ago" : Math.round(m / 60) + " h ago"; };
+
+async function call (path, body, method) {
+  const r = await fetch("/api/admin/" + path, {
+    method: method || (body ? "POST" : "GET"),
+    headers: Object.assign({ "content-type": "application/json" }, token ? { authorization: "Bearer " + token } : {}),
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  let d = {};
+  try { d = await r.json(); } catch (e) {}
+  if (r.status === 401 && token) { signOut(); }
+  if (!r.ok) throw new Error(d.error || ("Error " + r.status));
+  return d;
+}
+
+function show (which) {
+  for (const id of ["login", "verify", "panel"]) $(id).classList.toggle("hide", id !== which);
+}
+function signOut () {
+  token = "";
+  try { sessionStorage.removeItem("noxAdmin"); } catch (e) {}
+  show("login");
+}
+
+$("loginBtn").onclick = async () => {
+  $("loginErr").textContent = "";
+  try {
+    const d = await call("login", { user: $("user").value, pass: $("pass").value });
+    pending = d.pending;
+    $("pass").value = "";
+    show("verify");
+    $("code").focus();
+  } catch (e) { $("loginErr").textContent = e.message; }
+};
+$("pass").onkeydown = (e) => { if (e.key === "Enter") $("loginBtn").click(); };
+
+$("verifyBtn").onclick = async () => {
+  $("verifyErr").textContent = "";
+  try {
+    const d = await call("verify", { pending, code: $("code").value });
+    token = d.token;
+    try { sessionStorage.setItem("noxAdmin", token); } catch (e) {}
+    $("code").value = "";
+    show("panel");
+    load();
+  } catch (e) { $("verifyErr").textContent = e.message; }
+};
+$("code").onkeydown = (e) => { if (e.key === "Enter") $("verifyBtn").click(); };
+
+async function load () {
+  $("panelErr").textContent = "";
+  try {
+    const g = await call("games");
+    $("count").textContent = "(" + g.games.length + ")";
+    $("games").innerHTML = g.games.length ? g.games.map((x) =>
+      `<tr><td>${esc(x.game)}</td><td>${esc(x.host)}</td><td>${x.players}/${x.max}</td><td><code>${esc(x.code)}</code></td>` +
+      `<td class="wide dim">${ago(x.started)}</td>` +
+      `<td><button data-del="${esc(x.code)}">Delete</button><button class="bad" data-block="${esc(x.code)}">Block</button></td></tr>`).join("")
+      : `<tr><td colspan="6" class="dim">No games right now.</td></tr>`;
+    const b = await call("blocked");
+    $("blocked").innerHTML = b.ips.length ? b.ips.map((x) =>
+      `<tr><td><code>${esc(x.ip)}</code></td><td>${esc(x.game)} <span class="dim">by ${esc(x.host)}</span></td>` +
+      `<td class="wide">${esc(x.note)}</td><td class="wide dim">${ago(x.when)}</td>` +
+      `<td><button data-unblock="${esc(x.ip)}">Unblock</button></td></tr>`).join("")
+      : `<tr><td colspan="5" class="dim">Nobody is blocked.</td></tr>`;
+  } catch (e) { $("panelErr").textContent = e.message; }
+}
+
+document.addEventListener("click", async (e) => {
+  const t = e.target;
+  try {
+    if (t.dataset.del) { await call("delete", { code: t.dataset.del }); load(); }
+    if (t.dataset.block) {
+      const note = prompt("Block this PC from listing games? Add a note for yourself (why), or Cancel.", "");
+      if (note === null) return;
+      await call("block", { code: t.dataset.block, note }); load();
+    }
+    if (t.dataset.unblock) { await call("unblock", { ip: t.dataset.unblock }); load(); }
+  } catch (err) { $("panelErr").textContent = err.message; }
+});
+$("refresh").onclick = load;
+$("clear").onclick = async () => {
+  if (!confirm("Take every game off the list?")) return;
+  try { await call("clear", {}); load(); } catch (e) { $("panelErr").textContent = e.message; }
+};
+$("logout").onclick = async () => { try { await call("logout", {}); } catch (e) {} signOut(); };
+
+if (token) { show("panel"); load(); } else show("login");
+</script>
+</body></html>

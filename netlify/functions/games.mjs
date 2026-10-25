@@ -38,7 +38,9 @@ const pub = (g) => ({
 const isTunnel = (s) => /^wss:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(s);
 
 export default async (req, context) => {
-  const store = getStore("games");
+  // strong: a game checking in must find the entry it made 2 minutes ago (the default,
+  // "eventual", can answer with an older copy, and the game would get a new code each time)
+  const store = getStore({ name: "games", consistency: "strong" });
   const url = new URL(req.url);
   const path = url.pathname.replace(/\/+$/, "");
 
@@ -60,6 +62,11 @@ export default async (req, context) => {
     if (!ip && !url) return json({ error: "Your internet address couldn't be found (IPv6 only?)." }, 400);
     if (port < 1 || port > 65535) return json({ error: "bad port" }, 400);
 
+    // blocked in the admin panel (admin.mjs): this PC can't list games
+    const from = String(context.ip ?? "");
+    const blocked = (await getStore({ name: "admin", consistency: "strong" }).get("blocked", { type: "json" })) || { ips: [] };
+    if (from && blocked.ips.some((x) => x.ip === from)) return json({ error: "This PC can't host Nox games." }, 403);
+
     let code = clean(b.code, 6).toUpperCase();
     let token = clean(b.token, 40);
     if (code) {   // checking in again: only the host that made it may change it
@@ -73,9 +80,18 @@ export default async (req, context) => {
       }
       if (!code) return json({ error: "try again" }, 503);
       token = newToken();
+      if (url) {   // one tunnel is one game: an older entry for it goes
+        const { blobs } = await store.list();
+        for (const { key } of blobs.slice(0, 200)) {
+          const g = await store.get(key, { type: "json" });
+          if (g && g.url === url) await store.delete(key);
+        }
+      }
     }
+    const old = code ? await store.get(code, { type: "json" }) : null;
     const game = {
-      code, token, ip, port, url,
+      code, token, ip, port, url, from,
+      started: (old && old.started) || Date.now(),
       name: clean(b.name, 24) || "Someone",
       game: clean(b.game, 48) || "A Nox game",
       players: Math.max(0, Math.min(99, Number(b.players) | 0)),
