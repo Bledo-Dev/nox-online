@@ -16,7 +16,14 @@
 //   GET  /api/admin/blocked                          the blocked PCs
 //   POST /api/admin/unblock  { ip }
 //   GET  /api/admin/reports                          reports (waiting ones first), with how many people reported each player
-//   POST /api/admin/decide   { id, action }          action: "confirm" or "dismiss"
+//   POST /api/admin/decide   { id, action }          action: "confirm" (the reported player gets a strike),
+//                                                    "dismiss" (nothing happens), "false" (the reporter gets a strike)
+//   GET  /api/admin/shot?id=                         a report's screenshot (a PNG)
+//   GET  /api/admin/standing                         devices with strikes, time-outs and bans
+//   POST /api/admin/ban      { device, reason? }     banned for good
+//   POST /api/admin/unban    { device }              the time-out or ban ends, strikes back to 0
+//   GET  /api/admin/flags                            possible ban-dodgers (only shown: nothing happens to them)
+//   POST /api/admin/unflag   { device }
 //   GET  /api/admin/trusted                          the owner's own devices (never scored, timed out or banned)
 //   POST /api/admin/trust    { device, note? }
 //   POST /api/admin/untrust  { device }
@@ -24,6 +31,7 @@
 
 import { getStore } from "@netlify/blobs";
 import { createHash, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
+import { strike, ban, unban, getStanding, isDevice } from "../lib/standing.mjs";
 
 const MAX_FAILS = 5;                 // wrong logins (or codes) before a lock
 const LOCK_MS = 15 * 60 * 1000;      // how long the lock lasts
@@ -183,10 +191,12 @@ export default async (req, context) => {
       p.dev.add(r.reporter);
       p.ip.add(r.reporterIp);
     }
+    const strikes = {};   // (each reported player's strikes so far)
+    for (const r of list) if (!(r.target in strikes)) strikes[r.target] = (await getStanding(r.target)).strikes;
     const out = list.map((r) => ({
-      id: r.id, when: r.when, status: r.status, reason: r.reason, game: r.game, chat: r.chat, owner: !!r.owner,
-      target: r.target, targetName: r.targetName, reporterName: r.reporterName,
-      reporters: Math.min(people[r.target].dev.size, people[r.target].ip.size),
+      id: r.id, when: r.when, status: r.status, reason: r.reason, note: r.note || "", game: r.game, chat: r.chat, owner: !!r.owner,
+      shot: !!r.shot, target: r.target, targetName: r.targetName, reporter: r.reporter, reporterName: r.reporterName,
+      reporters: Math.min(people[r.target].dev.size, people[r.target].ip.size), strikes: strikes[r.target] || 0,
     }));
     out.sort((a, b) => ((b.status === "pending") - (a.status === "pending")) || (b.when - a.when));   // (waiting ones first, then newest)
     return json({ reports: out });
@@ -196,10 +206,60 @@ export default async (req, context) => {
     const store = getStore({ name: "reports", consistency: "strong" });
     const r = await store.get(String(b.id || ""), { type: "json" });
     if (!r) return json({ error: "That report is gone." }, 404);
-    if (b.action !== "confirm" && b.action !== "dismiss") return json({ error: "bad request" }, 400);
-    r.status = b.action === "confirm" ? "confirmed" : "dismissed";
+    if (!["confirm", "dismiss", "false"].includes(b.action)) return json({ error: "bad request" }, 400);
+    if (r.status !== "pending") return json({ error: "That report was already decided." }, 409);   // (no double strikes)
+    let result = {};
+    if (b.action === "confirm") result = await strike(r.target, r.reason, `report ${r.id}`);
+    if (b.action === "false") result = await strike(r.reporter, "False report", `report ${r.id}`);
+    r.status = b.action === "confirm" ? "confirmed" : b.action === "false" ? "false" : "dismissed";
     r.decided = Date.now();
     await store.setJSON(r.id, r);
+    return json({ ok: true, result });
+  }
+
+  if (what === "shot" && req.method === "GET") {
+    const b64 = await getStore({ name: "shots", consistency: "strong" }).get(String(url.searchParams.get("id") || ""));
+    if (!b64) return json({ error: "No screenshot." }, 404);
+    return new Response(Buffer.from(String(b64), "base64"), {
+      headers: { "content-type": "image/png", "cache-control": "private, max-age=3600", "content-security-policy": "default-src 'none'", "x-content-type-options": "nosniff" },
+    });
+  }
+
+  // ---- strikes, time-outs and bans ----
+  if (what === "standing" && req.method === "GET") {
+    const store = getStore({ name: "standing", consistency: "strong" });
+    const { blobs } = await store.list();
+    const now = Date.now(), list = [];
+    for (const { key } of blobs.slice(0, 500)) {
+      const x = await store.get(key, { type: "json" });
+      if (x && (x.strikes > 0 || x.banned))
+        list.push({ device: x.device, name: x.name, strikes: x.strikes, banned: !!x.banned, until: x.until > now ? x.until : 0, reason: x.reason || "", last: x.last || 0 });
+    }
+    list.sort((a, b) => (b.banned - a.banned) || (b.until - a.until) || (b.strikes - a.strikes));
+    return json({ devices: list });
+  }
+
+  if (what === "ban" && req.method === "POST") {
+    const device = String(b.device || "").trim().toLowerCase();
+    if (!isDevice(device)) return json({ error: "That's not a device ID." }, 400);
+    const r = await ban(device, String(b.reason || "").slice(0, 120));
+    if (r.skipped) return json({ error: "That's one of your trusted devices." }, 400);
+    return json({ ok: true });
+  }
+
+  if (what === "unban" && req.method === "POST") {
+    const device = String(b.device || "").trim().toLowerCase();
+    if (!isDevice(device)) return json({ error: "That's not a device ID." }, 400);
+    return json(await unban(device));
+  }
+
+  if (what === "flags" && req.method === "GET") {
+    return json({ flags: (await admin.get("flags", { type: "json" })) || [] });
+  }
+
+  if (what === "unflag" && req.method === "POST") {
+    const flags = (await admin.get("flags", { type: "json" })) || [];
+    await admin.setJSON("flags", flags.filter((f) => f.device !== String(b.device)));
     return json({ ok: true });
   }
 

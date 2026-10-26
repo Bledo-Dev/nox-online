@@ -4,16 +4,19 @@
 // "this code = this game, at this address" for a few minutes at a time.
 //
 //   POST /api/host    a host checks in (every 2 minutes while hosting)
-//                     { name, game, players, max, port, ip?, url?, token?, code?, stop? }
+//                     { name, game, players, max, port, ip?, url?, token?, code?, stop?, device? }
 //                     (url: a host that can't let players in directly comes through
 //                      Cloudflare's tunnel, wss://....trycloudflare.com)
 //                     -> { code, token, ip, port }
 //   GET  /api/games   the games checked in during the last 5 minutes
-//   GET  /api/code?c=ABC123   one game, by its code
+//   GET  /api/code?c=ABC123&device=...   one game, by its code
+//
+// A device that's timed out or banned (lib/standing.mjs) can't host or look up a game.
 //
 // Everything is kept in Netlify Blobs (store "games", one entry per code).
 
 import { getStore } from "@netlify/blobs";
+import { check } from "../lib/standing.mjs";
 
 const STALE_MS = 5 * 60 * 1000;   // not heard from in 5 minutes: gone
 const ALPHA = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
@@ -36,6 +39,8 @@ const pub = (g) => ({
   ip: g.ip, port: g.port, url: g.url || "", version: g.version,
 });
 const isTunnel = (s) => /^wss:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(s);
+// timed out or banned: refused, with what to show the player
+const refused = (st) => json({ error: st.message, blocked: true, until: st.until, left: st.left || 0 }, 403);
 
 export default async (req, context) => {
   // strong: a game checking in must find the entry it made 2 minutes ago (the default,
@@ -62,6 +67,11 @@ export default async (req, context) => {
     if (!ip && !url) return json({ error: "Your internet address couldn't be found (IPv6 only?)." }, 400);
     if (port < 1 || port > 65535) return json({ error: "bad port" }, 400);
 
+    // timed out or banned: no hosting
+    if (b.device) {
+      const st = await check(String(b.device).toLowerCase(), clean(b.name, 24), String(context.ip ?? ""));
+      if (st.blocked) return refused(st);
+    }
     // blocked in the admin panel (admin.mjs): this PC can't list games
     const from = String(context.ip ?? "");
     const admin = getStore({ name: "admin", consistency: "strong" });
@@ -94,7 +104,7 @@ export default async (req, context) => {
     }
     const old = code ? await store.get(code, { type: "json" }) : null;
     const game = {
-      code, token, ip, port, url, from,
+      code, token, ip, port, url, from, device: /^[0-9a-f]{32}$/.test(String(b.device || "")) ? String(b.device) : "",
       started: (old && old.started) || Date.now(),
       name: clean(b.name, 24) || "Someone",
       game: clean(b.game, 48) || "A Nox game",
@@ -121,6 +131,11 @@ export default async (req, context) => {
   }
 
   if (req.method === "GET" && path.endsWith("/code")) {
+    const device = String(url.searchParams.get("device") || "").toLowerCase();
+    if (device) {
+      const st = await check(device, String(url.searchParams.get("name") || ""), String(context.ip ?? ""));
+      if (st.blocked) return refused(st);
+    }
     const c = clean(url.searchParams.get("c"), 6).toUpperCase();
     const g = c ? await store.get(c, { type: "json" }) : null;
     if (!g || Date.now() - g.updated > STALE_MS) return json({ error: "No game is using that code right now." }, 404);

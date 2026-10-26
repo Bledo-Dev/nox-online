@@ -15,12 +15,14 @@ td button{padding:4px 10px;margin-right:4px}
 .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
 .hide{display:none}code{background:#2a2a30;padding:1px 5px}
 details{margin-top:4px}summary{cursor:pointer;color:#999}.chat{background:#232328;padding:6px 8px;margin-top:4px;font-size:13px;white-space:pre-wrap}
-.st-confirmed{color:#e98a72}.st-dismissed{color:#888}.st-pending{color:#e6c46a}
+.st-confirmed{color:#e98a72}.st-dismissed{color:#888}.st-false{color:#c9a0e6}.st-pending{color:#e6c46a}
+.shot{max-width:100%;margin-top:6px;border:1px solid #444;display:block;cursor:zoom-in}.shot.big{cursor:zoom-out}
+.note{color:#ccc;font-style:italic}.tag{font-size:12px;padding:1px 6px;border:1px solid #555;margin-left:4px}
 @media (max-width:640px){.wide{display:none}}
 </style></head>
 <body>
 <h1>Nox admin</h1>
-<p class="dim">Take games off the list, look at reports, and stop a PC from listing games.</p>
+<p class="dim">Take games off the list, look at reports, time out and ban players, and stop a PC from listing games.</p>
 
 <div id="login">
   <label>Username<input id="user" autocomplete="username"></label>
@@ -51,6 +53,21 @@ details{margin-top:4px}summary{cursor:pointer;color:#999}.chat{background:#23232
   <p class="dim">What players reported, with the chat the reporter saw. "People" counts different reporters (the same device or address counts once).</p>
   <table><thead><tr><th>Player</th><th>Why</th><th>People</th><th class="wide">Game</th><th class="wide">When</th><th></th></tr></thead>
   <tbody id="reports"></tbody></table>
+
+  <h2>Timed out and banned <span class="dim" id="scount"></span></h2>
+  <p class="dim">Each confirmed report is a strike: 1 a warning, 2 one hour, 3 one day, 4 one week, 5 banned. Unban ends it and sets the strikes back to 0.</p>
+  <div class="bar">
+    <input id="bdev" placeholder="Device ID to ban" style="width:300px;margin:0">
+    <input id="bwhy" placeholder="Why (they'll see this)" style="width:200px;margin:0">
+    <button class="bad" id="badd">Ban</button>
+  </div>
+  <table><thead><tr><th>Player</th><th>Strikes</th><th>Now</th><th class="wide">Why</th><th></th></tr></thead>
+  <tbody id="standing"></tbody></table>
+
+  <h2>Maybe a banned player on a new device</h2>
+  <p class="dim">A new device on the same internet as someone timed out or banned this week, with a similar name. Nothing happens to them unless you ban them. (A family or a school shares one internet address, so check first.)</p>
+  <table><thead><tr><th>New device</th><th>Looks like</th><th class="wide">When</th><th></th></tr></thead>
+  <tbody id="flags"></tbody></table>
 
   <h2>Trusted devices</h2>
   <p class="dim">Your own devices: never scored, timed out or banned. The Nox app shows a device's ID in Settings.</p>
@@ -123,6 +140,17 @@ $("verifyBtn").onclick = async () => {
 };
 $("code").onkeydown = (e) => { if (e.key === "Enter") $("verifyBtn").click(); };
 
+// screenshots need the sign-in, so they're fetched, then shown
+async function loadShot (img) {
+  try {
+    const r = await fetch("/api/admin/shot?id=" + encodeURIComponent(img.dataset.shotid), { headers: { authorization: "Bearer " + token } });
+    if (!r.ok) { img.replaceWith(Object.assign(document.createElement("div"), { className: "dim", textContent: "(screenshot missing)" })); return; }
+    img.src = URL.createObjectURL(await r.blob());
+    img.style.maxWidth = "260px";
+    img.onclick = () => { const big = img.classList.toggle("big"); img.style.maxWidth = big ? "100%" : "260px"; };
+  } catch (e) {}
+}
+
 async function load () {
   $("panelErr").textContent = "";
   try {
@@ -137,14 +165,31 @@ async function load () {
     const waiting = rp.reports.filter((r) => r.status === "pending").length;
     $("rcount").textContent = "(" + waiting + " waiting)";
     $("reports").innerHTML = rp.reports.length ? rp.reports.map((r) =>
-      `<tr><td>${esc(r.targetName)}${r.owner ? ' <span class="dim">(your device)</span>' : ""}<br><code>${esc(r.target.slice(0, 12))}</code>` +
-      `<details><summary>chat</summary><div class="chat">${r.chat.length ? r.chat.map(esc).join("\n") : "(no chat)"}</div>` +
-      `<div class="dim">reported by ${esc(r.reporterName)}</div></details></td>` +
-      `<td>${esc(r.reason)}</td><td>${r.reporters}</td><td class="wide">${esc(r.game)}</td><td class="wide dim">${ago(r.when)}</td>` +
+      `<tr><td>${esc(r.targetName)}${r.owner ? ' <span class="dim">(your device)</span>' : ""}` +
+      `${r.strikes ? `<span class="tag">${r.strikes} strike${r.strikes > 1 ? "s" : ""}</span>` : ""}<br><code>${esc(r.target.slice(0, 12))}</code>` +
+      `<details><summary>${r.shot ? "screenshot and chat" : "chat"}</summary>` +
+      (r.shot ? `<img class="shot" data-shotid="${esc(r.id)}" alt="screenshot">` : "") +
+      `<div class="chat">${r.chat.length ? r.chat.map(esc).join("\n") : "(no chat)"}</div>` +
+      `<div class="dim">reported by ${esc(r.reporterName)} <code>${esc(String(r.reporter || "").slice(0, 12))}</code></div></details></td>` +
+      `<td>${esc(r.reason)}${r.note ? `<br><span class="note">"${esc(r.note)}"</span>` : ""}</td><td>${r.reporters}</td><td class="wide">${esc(r.game)}</td><td class="wide dim">${ago(r.when)}</td>` +
       `<td>${r.status === "pending"
-        ? `<button class="bad" data-confirm="${esc(r.id)}">Confirm</button><button data-dismiss="${esc(r.id)}">Dismiss</button>`
-        : `<span class="st-${r.status}">${r.status}</span>`}</td></tr>`).join("")
+        ? `<button class="bad" data-confirm="${esc(r.id)}" title="${esc(r.targetName)} gets a strike">Confirm</button><button data-dismiss="${esc(r.id)}" title="Nothing happens to anyone">Dismiss</button><button data-false="${esc(r.id)}" title="${esc(r.reporterName)} gets a strike, for reporting with no reason">False report</button>`
+        : `<span class="st-${r.status}">${r.status === "false" ? "false report" : r.status}</span>`}</td></tr>`).join("")
       : `<tr><td colspan="6" class="dim">No reports.</td></tr>`;
+    for (const img of document.querySelectorAll("img[data-shotid]")) loadShot(img);
+    const sd = await call("standing");
+    const left = (t) => { const m = Math.max(1, Math.round((t - Date.now()) / 60000)); return m < 60 ? m + " min" : m < 2880 ? Math.round(m / 60) + " h" : Math.round(m / 1440) + " days"; };
+    $("scount").textContent = "(" + sd.devices.filter((d) => d.banned || d.until).length + " right now)";
+    $("standing").innerHTML = sd.devices.length ? sd.devices.map((d) =>
+      `<tr><td>${esc(d.name || "?")}<br><code>${esc(d.device)}</code></td><td>${d.strikes}</td>` +
+      `<td>${d.banned ? '<span class="st-confirmed">banned</span>' : d.until ? `timed out, ${left(d.until)} left` : '<span class="dim">warned</span>'}</td>` +
+      `<td class="wide">${esc(d.reason)}</td><td><button data-unban="${esc(d.device)}">Unban</button>${d.banned ? "" : `<button class="bad" data-ban="${esc(d.device)}">Ban</button>`}</td></tr>`).join("")
+      : `<tr><td colspan="5" class="dim">Nobody has a strike.</td></tr>`;
+    const fl = await call("flags");
+    $("flags").innerHTML = fl.flags.length ? fl.flags.map((f) =>
+      `<tr><td>${esc(f.name)}<br><code>${esc(f.device)}</code></td><td>${esc(f.likeName)}<br><code>${esc(f.like)}</code></td>` +
+      `<td class="wide dim">${ago(f.when)}</td><td><button class="bad" data-ban="${esc(f.device)}">Ban</button><button data-unflag="${esc(f.device)}">Ignore</button></td></tr>`).join("")
+      : `<tr><td colspan="4" class="dim">Nothing to look at.</td></tr>`;
     const t = await call("trusted");
     $("trusted").innerHTML = t.devices.length ? t.devices.map((d) =>
       `<tr><td><code>${esc(d.device)}</code></td><td>${esc(d.note)}</td><td class="wide dim">${ago(d.when)}</td>` +
@@ -171,10 +216,28 @@ document.addEventListener("click", async (e) => {
     if (t.dataset.unblock) { await call("unblock", { ip: t.dataset.unblock }); load(); }
     if (t.dataset.confirm) { await call("decide", { id: t.dataset.confirm, action: "confirm" }); load(); }
     if (t.dataset.dismiss) { await call("decide", { id: t.dataset.dismiss, action: "dismiss" }); load(); }
+    if (t.dataset.false) {
+      if (!confirm("Mark as a false report? The person who reported gets a strike.")) return;
+      await call("decide", { id: t.dataset.false, action: "false" }); load();
+    }
+    if (t.dataset.ban) {
+      const why = prompt("Ban this device for good? They'll see why, so write it for them (or Cancel).", "Breaking the rules");
+      if (why === null) return;
+      await call("ban", { device: t.dataset.ban, reason: why }); load();
+    }
+    if (t.dataset.unban) { if (confirm("Unban? Their strikes go back to 0.")) { await call("unban", { device: t.dataset.unban }); load(); } }
+    if (t.dataset.unflag) { await call("unflag", { device: t.dataset.unflag }); load(); }
     if (t.dataset.untrust) { if (confirm("Remove this trusted device?")) { await call("untrust", { device: t.dataset.untrust }); load(); } }
   } catch (err) { $("panelErr").textContent = err.message; }
 });
 $("refresh").onclick = load;
+$("badd").onclick = async () => {
+  try {
+    if (!confirm("Ban this device for good?")) return;
+    await call("ban", { device: $("bdev").value, reason: $("bwhy").value || "Breaking the rules" });
+    $("bdev").value = ""; $("bwhy").value = ""; load();
+  } catch (e) { $("panelErr").textContent = e.message; }
+};
 $("tadd").onclick = async () => {
   try { await call("trust", { device: $("tdev").value, note: $("tnote").value }); $("tdev").value = ""; $("tnote").value = ""; load(); }
   catch (e) { $("panelErr").textContent = e.message; }
