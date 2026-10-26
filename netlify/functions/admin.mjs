@@ -15,6 +15,11 @@
 //   POST /api/admin/block    { code, note? }         off the list, and its PC can't list games again
 //   GET  /api/admin/blocked                          the blocked PCs
 //   POST /api/admin/unblock  { ip }
+//   GET  /api/admin/reports                          reports (waiting ones first), with how many people reported each player
+//   POST /api/admin/decide   { id, action }          action: "confirm" or "dismiss"
+//   GET  /api/admin/trusted                          the owner's own devices (never scored, timed out or banned)
+//   POST /api/admin/trust    { device, note? }
+//   POST /api/admin/untrust  { device }
 //   POST /api/admin/logout
 
 import { getStore } from "@netlify/blobs";
@@ -159,6 +164,63 @@ export default async (req, context) => {
       const x = await games.get(key, { type: "json" });
       if (x && x.from === g.from) await games.delete(key);
     }
+    return json({ ok: true });
+  }
+
+  // ---- reports ----
+  if (what === "reports" && req.method === "GET") {
+    const store = getStore({ name: "reports", consistency: "strong" });
+    const { blobs } = await store.list();
+    const keys = blobs.map((x) => x.key).sort().reverse().slice(0, 300);   // (newest first: keys start with the time)
+    const list = [];
+    for (const key of keys) {
+      const r = await store.get(key, { type: "json" });
+      if (r) list.push(r);
+    }
+    const people = {};   // per reported device: different reporters (devices and addresses both counted once)
+    for (const r of list) {
+      const p = (people[r.target] = people[r.target] || { dev: new Set(), ip: new Set() });
+      p.dev.add(r.reporter);
+      p.ip.add(r.reporterIp);
+    }
+    const out = list.map((r) => ({
+      id: r.id, when: r.when, status: r.status, reason: r.reason, game: r.game, chat: r.chat, owner: !!r.owner,
+      target: r.target, targetName: r.targetName, reporterName: r.reporterName,
+      reporters: Math.min(people[r.target].dev.size, people[r.target].ip.size),
+    }));
+    out.sort((a, b) => ((b.status === "pending") - (a.status === "pending")) || (b.when - a.when));   // (waiting ones first, then newest)
+    return json({ reports: out });
+  }
+
+  if (what === "decide" && req.method === "POST") {
+    const store = getStore({ name: "reports", consistency: "strong" });
+    const r = await store.get(String(b.id || ""), { type: "json" });
+    if (!r) return json({ error: "That report is gone." }, 404);
+    if (b.action !== "confirm" && b.action !== "dismiss") return json({ error: "bad request" }, 400);
+    r.status = b.action === "confirm" ? "confirmed" : "dismissed";
+    r.decided = Date.now();
+    await store.setJSON(r.id, r);
+    return json({ ok: true });
+  }
+
+  // ---- the owner's own devices ----
+  if (what === "trusted" && req.method === "GET") {
+    return json((await admin.get("trusted", { type: "json" })) || { devices: [] });
+  }
+
+  if (what === "trust" && req.method === "POST") {
+    const device = String(b.device || "").trim().toLowerCase();
+    if (!/^[0-9a-f]{32}$/.test(device)) return json({ error: "A device ID is 32 letters and numbers (Settings in the Nox app shows it)." }, 400);
+    const t = (await admin.get("trusted", { type: "json" })) || { devices: [] };
+    if (!t.devices.some((d) => d.device === device)) t.devices.push({ device, note: String(b.note || "").slice(0, 80), when: Date.now() });
+    await admin.setJSON("trusted", t);
+    return json({ ok: true });
+  }
+
+  if (what === "untrust" && req.method === "POST") {
+    const t = (await admin.get("trusted", { type: "json" })) || { devices: [] };
+    t.devices = t.devices.filter((d) => d.device !== String(b.device));
+    await admin.setJSON("trusted", t);
     return json({ ok: true });
   }
 
