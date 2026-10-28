@@ -19,6 +19,7 @@
 
 import { getStore } from "@netlify/blobs";
 import { check } from "../lib/standing.mjs";
+import { claimName } from "../lib/names.mjs";
 
 const STALE_MS = 5 * 60 * 1000;   // not heard from in 5 minutes: gone
 const GENRES = ["Obby", "Adventure", "Roleplay", "Fighting", "Shooter", "Racing", "Simulator", "Horror", "Puzzle", "Sandbox", "Hangout", "Other"];
@@ -73,9 +74,16 @@ export default async (req, context) => {
     if (port < 1 || port > 65535) return json({ error: "bad port" }, 400);
 
     // timed out or banned: no hosting
+    let nameKey = "";
     if (b.device) {
       const st = await check(String(b.device).toLowerCase(), clean(b.name, 24), String(context.ip ?? ""));
       if (st.blocked) return refused(st);
+      // the host's name is theirs (names have one owner each: lib/names.mjs)
+      if (b.claim) {
+        const r = await claimName(b.device, b.key, b.name, String(context.ip ?? ""));
+        if (r.error) return json({ error: r.error, name: true }, r.status === 400 ? 400 : 409);
+        nameKey = r.key || "";
+      }
     }
     // blocked in the admin panel (admin.mjs): this PC can't list games
     const from = String(context.ip ?? "");
@@ -122,7 +130,7 @@ export default async (req, context) => {
       updated: Date.now(),
     };
     await store.setJSON(code, game);
-    return json({ code, token, ip, port, url });
+    return json(nameKey ? { code, token, ip, port, url, key: nameKey } : { code, token, ip, port, url });
   }
 
   if (req.method === "GET" && path.endsWith("/games")) {

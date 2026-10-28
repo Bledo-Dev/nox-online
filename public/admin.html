@@ -69,6 +69,14 @@ details{margin-top:4px}summary{cursor:pointer;color:#999}.chat{background:#23232
   <table><thead><tr><th>New device</th><th>Looks like</th><th class="wide">When</th><th></th></tr></thead>
   <tbody id="flags"></tbody></table>
 
+  <h2>Names</h2>
+  <p class="dim">Each name has one owner. Taking a name away makes its owner pick a new one next time they open Nox.</p>
+  <div class="bar">
+    <input id="nname" placeholder="A player's name" style="width:220px;margin:0">
+    <button id="nlook">Look up</button>
+    <span id="nres" class="dim"></span>
+  </div>
+
   <h2>Trusted devices</h2>
   <p class="dim">Your own devices: never scored, timed out or banned. The Nox app shows a device's ID in Settings.</p>
   <div class="bar">
@@ -228,11 +236,23 @@ document.addEventListener("click", async (e) => {
       await call("ban", { device: t.dataset.ban, reason: why }); load();
     }
     if (t.dataset.unban) { if (confirm("Unban? Their strikes go back to 0.")) { await call("unban", { device: t.dataset.unban }); load(); } }
+    if (t.dataset.freename) {
+      if (!confirm("Take the name " + t.dataset.freename + " away? Its owner will have to pick a new one.")) return;
+      await call("freename", { name: t.dataset.freename }); $("nres").textContent = "Done: the name is free.";
+    }
     if (t.dataset.unflag) { await call("unflag", { device: t.dataset.unflag }); load(); }
     if (t.dataset.untrust) { if (confirm("Remove this trusted device?")) { await call("untrust", { device: t.dataset.untrust }); load(); } }
   } catch (err) { $("panelErr").textContent = err.message; }
 });
 $("refresh").onclick = load;
+$("nlook").onclick = async () => {
+  $("nres").innerHTML = "";
+  try {
+    const n = await call("name?name=" + encodeURIComponent($("nname").value.trim()));
+    $("nres").innerHTML = `<b>${esc(n.name)}</b> &nbsp;device <code>${esc(n.device)}</code> &nbsp;since ${esc(new Date(n.at).toLocaleDateString())} ` +
+      `<button class="bad" data-freename="${esc(n.name)}">Take it away</button>`;
+  } catch (e) { $("nres").textContent = e.message; }
+};
 $("badd").onclick = async () => {
   try {
     if (!confirm("Ban this device for good?")) return;

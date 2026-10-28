@@ -24,6 +24,8 @@
 //   POST /api/admin/unban    { device }              the time-out or ban ends, strikes back to 0
 //   GET  /api/admin/flags                            possible ban-dodgers (only shown: nothing happens to them)
 //   POST /api/admin/unflag   { device }
+//   GET  /api/admin/name?name=                       who has a name
+//   POST /api/admin/freename { name }                take a name away (its owner picks a new one)
 //   GET  /api/admin/trusted                          the owner's own devices (never scored, timed out or banned)
 //   POST /api/admin/trust    { device, note? }
 //   POST /api/admin/untrust  { device }
@@ -32,6 +34,7 @@
 import { getStore } from "@netlify/blobs";
 import { createHash, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 import { strike, ban, unban, getStanding, isDevice } from "../lib/standing.mjs";
+import { nameInfo, freeName } from "../lib/names.mjs";
 
 const MAX_FAILS = 5;                 // wrong logins (or codes) before a lock
 const LOCK_MS = 15 * 60 * 1000;      // how long the lock lasts
@@ -283,6 +286,16 @@ export default async (req, context) => {
     t.devices = t.devices.filter((d) => d.device !== String(b.device));
     await admin.setJSON("trusted", t);
     return json({ ok: true });
+  }
+
+  // ---- names ----
+  if (what === "name" && req.method === "GET") {
+    const n = await nameInfo(url.searchParams.get("name"));
+    return n ? json(n) : json({ error: "Nobody has that name." }, 404);
+  }
+
+  if (what === "freename" && req.method === "POST") {
+    return (await freeName(b.name)) ? json({ ok: true }) : json({ error: "Nobody has that name." }, 404);
   }
 
   if (what === "blocked" && req.method === "GET") {
