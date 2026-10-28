@@ -10,6 +10,8 @@
 //                     -> { code, token, ip, port }
 //   GET  /api/games   the games checked in during the last 5 minutes
 //   GET  /api/code?c=ABC123&device=...   one game, by its code
+//   POST /api/thumb   { code, token, png }   the host's picture of its game (a small PNG, base64)
+//   GET  /api/thumb?c=ABC123   that picture (&b64=1: as base64 text, for the Nox app)
 //
 // A device that's timed out or banned (lib/standing.mjs) can't host or look up a game.
 //
@@ -19,6 +21,8 @@ import { getStore } from "@netlify/blobs";
 import { check } from "../lib/standing.mjs";
 
 const STALE_MS = 5 * 60 * 1000;   // not heard from in 5 minutes: gone
+const GENRES = ["Obby", "Adventure", "Roleplay", "Fighting", "Shooter", "Racing", "Simulator", "Horror", "Puzzle", "Sandbox", "Hangout", "Other"];
+const THUMB_MAX = 200 * 1024;     // (base64 characters: a picture of about 150 KB at most)
 const ALPHA = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 const VERSION = 1;
 
@@ -37,6 +41,7 @@ const newToken = () => Array.from({ length: 24 }, () => ALPHA[Math.floor(Math.ra
 const pub = (g) => ({
   code: g.code, game: g.game, host: g.name, players: g.players, max: g.max,
   ip: g.ip, port: g.port, url: g.url || "", version: g.version,
+  desc: g.desc || "", genre: g.genre || "", thumb: !!g.thumb,
 });
 const isTunnel = (s) => /^wss:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(s);
 // timed out or banned: refused, with what to show the player
@@ -56,7 +61,7 @@ export default async (req, context) => {
     // a host that stops: take its game off the list
     if (b.stop && b.code && b.token) {
       const old = await store.get(String(b.code), { type: "json" });
-      if (old && old.token === b.token) await store.delete(String(b.code));
+      if (old && old.token === b.token) { await store.delete(String(b.code)); await thumbs().delete(String(b.code)); }
       return json({ ok: true });
     }
 
@@ -111,6 +116,9 @@ export default async (req, context) => {
       players: Math.max(0, Math.min(99, Number(b.players) | 0)),
       max: Math.max(1, Math.min(99, Number(b.max) | 0 || 16)),
       version: Number(b.version) | 0 || VERSION,
+      desc: clean(b.desc, 120),
+      genre: GENRES.includes(b.genre) ? b.genre : "",
+      thumb: !!(old && old.thumb),
       updated: Date.now(),
     };
     await store.setJSON(code, game);
@@ -123,7 +131,7 @@ export default async (req, context) => {
     for (const { key } of blobs.slice(0, 200)) {
       const g = await store.get(key, { type: "json" });
       if (!g) continue;
-      if (now - g.updated > STALE_MS) { await store.delete(key); continue; }   // (tidy up as we go)
+      if (now - g.updated > STALE_MS) { await store.delete(key); await thumbs().delete(key); continue; }   // (tidy up as we go)
       list.push(pub(g));
     }
     list.sort((a, b) => b.players - a.players);
@@ -142,7 +150,34 @@ export default async (req, context) => {
     return json(pub(g));
   }
 
+  // ---- the games' pictures ----
+  if (req.method === "POST" && path.endsWith("/thumb")) {
+    let b;
+    try { b = await req.json(); } catch { return json({ error: "bad request" }, 400); }
+    const code = clean(b.code, 6).toUpperCase();
+    const g = code ? await store.get(code, { type: "json" }) : null;
+    if (!g || g.token !== String(b.token || "")) return json({ error: "not your game" }, 403);
+    const png = typeof b.png === "string" && b.png.length <= THUMB_MAX && /^iVBORw0KGgo[A-Za-z0-9+/=]*$/.test(b.png) ? b.png : "";
+    if (!png) return json({ error: "That's not a picture Nox can use." }, 400);
+    await thumbs().set(code, png);
+    g.thumb = true;
+    await store.setJSON(code, g);
+    return json({ ok: true });
+  }
+
+  if (req.method === "GET" && path.endsWith("/thumb")) {
+    const code = clean(url.searchParams.get("c"), 6).toUpperCase();
+    const png = code ? await thumbs().get(code) : null;
+    if (!png) return json({ error: "No picture." }, 404);
+    if (url.searchParams.get("b64")) return new Response(String(png), { headers: { "content-type": "text/plain", "cache-control": "max-age=60" } });
+    return new Response(Buffer.from(String(png), "base64"), {
+      headers: { "content-type": "image/png", "cache-control": "max-age=60", "content-security-policy": "default-src 'none'", "x-content-type-options": "nosniff" },
+    });
+  }
+
   return json({ error: "not found" }, 404);
 };
 
-export const config = { path: ["/api/host", "/api/games", "/api/code"] };
+const thumbs = () => getStore({ name: "thumbs", consistency: "strong" });
+
+export const config = { path: ["/api/host", "/api/games", "/api/code", "/api/thumb"] };
