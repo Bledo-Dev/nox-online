@@ -1,10 +1,49 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Nox</title>
-<style>body{font-family:system-ui,sans-serif;background:#1c1c1f;color:#ddd;max-width:640px;margin:60px auto;padding:0 16px}
-h1{color:#fff}a{color:#56a0d6}code{background:#2a2a30;padding:2px 6px}</style></head>
-<body><h1>Nox</h1>
-<p>This is where the Nox app looks up games that are being hosted. Get the Nox app and press Play.</p>
-<p>Games online right now: <span id="n">...</span></p>
-<script>fetch('/api/games').then(r=>r.json()).then(d=>{document.getElementById('n').textContent=d.games.length}).catch(()=>{document.getElementById('n').textContent='?'})</script>
+<link rel="icon" href="/favicon.png">
+<style>
+body{font-family:system-ui,sans-serif;background:#1c1c1f;color:#ddd;max-width:680px;margin:48px auto;padding:0 16px;line-height:1.5}
+h1{color:#fff;margin:0;font-size:40px}h2{color:#fff;font-size:19px;margin:0 0 6px}
+a{color:#f2c94c}.dim{color:#999}.top{display:flex;gap:18px;align-items:center;margin-bottom:28px}
+.top img{width:84px;height:84px}
+.card{background:#26262b;border:1px solid #34343a;padding:18px 20px;margin:14px 0}
+.dl{display:inline-block;background:#f2c94c;color:#1e2534;font-weight:600;text-decoration:none;padding:10px 18px;margin:6px 0 10px}
+.dl:hover{background:#ffd866}ol{margin:6px 0 0;padding-left:20px}li{margin:3px 0}
+.size{color:#999;font-size:14px;margin-left:8px}footer{margin-top:36px;font-size:14px}
+</style></head>
+<body>
+<div class="top"><img src="/icon.png" alt=""><div><h1>Nox</h1><div class="dim">Play games made with Nox Studio, with friends on your Wi-Fi or anywhere.</div></div></div>
+
+<div class="card">
+  <h2>Windows</h2>
+  <a class="dl" href="/downloads/Nox-Windows.zip" download>Download for Windows</a><span class="size" data-size="/downloads/Nox-Windows.zip"></span>
+  <ol class="dim">
+    <li>Unzip it anywhere (right-click, Extract All), then open <b>nox.exe</b> in the Nox folder.</li>
+    <li>Windows may say it protected your PC, because Nox is new and not signed yet: click <b>More info</b>, then <b>Run anyway</b>.</li>
+    <li>If Windows asks about the firewall, click <b>Allow</b>, or games on your Wi-Fi won't show up.</li>
+  </ol>
+</div>
+
+<div class="card">
+  <h2>Android</h2>
+  <a class="dl" href="/downloads/Nox-Android.apk" download>Download for Android</a><span class="size" data-size="/downloads/Nox-Android.apk"></span>
+  <ol class="dim">
+    <li>Open the file once it's downloaded.</li>
+    <li>Your phone will ask to allow installing apps from your browser (Nox isn't on the Play Store yet): allow it, then <b>Install</b>.</li>
+  </ol>
+</div>
+
+<p>Games online right now: <b id="n">...</b></p>
+<p class="dim">To join, open Nox, pick a name in Settings, then press Join on a game, or type the code a friend gives you.</p>
+<footer class="dim">No iPhone version yet.</footer>
+
+<script>
+fetch('/api/games').then(r=>r.json()).then(d=>{document.getElementById('n').textContent=d.games.length}).catch(()=>{document.getElementById('n').textContent='?'})
+for (const el of document.querySelectorAll('[data-size]'))   // (how big each download is)
+  fetch(el.dataset.size, { method: 'HEAD' }).then(r => {
+    const n = +r.headers.get('content-length');
+    el.textContent = r.ok && n ? (n / 1048576).toFixed(1) + ' MB' : r.ok ? '' : '(not uploaded yet)';
+  }).catch(() => {});
+</script>
 </body></html>
