@@ -1,8 +1,10 @@
-// Nox: claiming a player name (the Nox app's Settings, and when it starts).
+// Nox: usernames (the Nox app's Settings, and when it starts). A username is picked once
+// and can't be changed (lib/names.mjs).
 //
-//   POST /api/name  { device, key?, name }
+//   POST /api/name  { device, key?, name }   name "": just say what this device's username is
 //   -> { ok, name, key? }   (key: only the first time; the app keeps it in nox_name.txt)
-//   -> { error }            (409: the name is someone else's; 400: not a valid name)
+//   -> { error, name? }     (409: taken, not allowed, or this device already has one (name);
+//                            400: not a valid username; 403: the name key doesn't match)
 
 import { claimName } from "../lib/names.mjs";
 
@@ -14,7 +16,7 @@ export default async (req, context) => {
   let b;
   try { b = await req.json(); } catch { return json({ error: "bad request" }, 400); }
   const r = await claimName(b.device, b.key, b.name, String(context.ip ?? ""));
-  return r.error ? json({ error: r.error }, r.status) : json(r);
+  return r.error ? json(r.name ? { error: r.error, name: r.name } : { error: r.error }, r.status) : json(r);
 };
 
 export const config = { path: "/api/name" };

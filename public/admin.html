@@ -69,10 +69,11 @@ details{margin-top:4px}summary{cursor:pointer;color:#999}.chat{background:#23232
   <table><thead><tr><th>New device</th><th>Looks like</th><th class="wide">When</th><th></th></tr></thead>
   <tbody id="flags"></tbody></table>
 
-  <h2>Names</h2>
-  <p class="dim">Each name has one owner. Taking a name away makes its owner pick a new one next time they open Nox.</p>
+  <h2>Usernames</h2>
+  <p class="dim">Each username has one owner and players can't change it. Resetting one makes its owner pick a new one next time they open Nox.
+    "Reset and block" also keeps anyone from taking that username again (for a bad one).</p>
   <div class="bar">
-    <input id="nname" placeholder="A player's name" style="width:220px;margin:0">
+    <input id="nname" placeholder="A username" style="width:220px;margin:0">
     <button id="nlook">Look up</button>
     <span id="nres" class="dim"></span>
   </div>
@@ -237,8 +238,12 @@ document.addEventListener("click", async (e) => {
     }
     if (t.dataset.unban) { if (confirm("Unban? Their strikes go back to 0.")) { await call("unban", { device: t.dataset.unban }); load(); } }
     if (t.dataset.freename) {
-      if (!confirm("Take the name " + t.dataset.freename + " away? Its owner will have to pick a new one.")) return;
-      await call("freename", { name: t.dataset.freename }); $("nres").textContent = "Done: the name is free.";
+      const hold = t.dataset.hold === "1", held = t.dataset.held === "1";
+      if (!confirm(held ? "Let anyone take the username " + t.dataset.freename + " again?" :
+                   "Reset the username " + t.dataset.freename + "? Its owner will have to pick a new one." +
+                   (hold ? " Nobody can take this one again." : " Anyone can take this one again."))) return;
+      await call("freename", { name: t.dataset.freename, hold });
+      $("nres").textContent = held || !hold ? "Done: the username is free." : "Done: reset, and nobody can take it.";
     }
     if (t.dataset.unflag) { await call("unflag", { device: t.dataset.unflag }); load(); }
     if (t.dataset.untrust) { if (confirm("Remove this trusted device?")) { await call("untrust", { device: t.dataset.untrust }); load(); } }
@@ -249,8 +254,11 @@ $("nlook").onclick = async () => {
   $("nres").innerHTML = "";
   try {
     const n = await call("name?name=" + encodeURIComponent($("nname").value.trim()));
-    $("nres").innerHTML = `<b>${esc(n.name)}</b> &nbsp;device <code>${esc(n.device)}</code> &nbsp;since ${esc(new Date(n.at).toLocaleDateString())} ` +
-      `<button class="bad" data-freename="${esc(n.name)}">Take it away</button>`;
+    $("nres").innerHTML = n.held ?
+      `<b>${esc(n.name)}</b> &nbsp;blocked since ${esc(new Date(n.at).toLocaleDateString())} <button data-freename="${esc(n.name)}" data-held="1">Unblock</button>` :
+      `<b>${esc(n.name)}</b> &nbsp;device <code>${esc(n.device)}</code> &nbsp;since ${esc(new Date(n.at).toLocaleDateString())} ` +
+      `<button class="bad" data-freename="${esc(n.name)}" data-hold="1">Reset and block</button> ` +
+      `<button data-freename="${esc(n.name)}">Reset</button>`;
   } catch (e) { $("nres").textContent = e.message; }
 };
 $("badd").onclick = async () => {

@@ -291,11 +291,11 @@ export default async (req, context) => {
   // ---- names ----
   if (what === "name" && req.method === "GET") {
     const n = await nameInfo(url.searchParams.get("name"));
-    return n ? json(n) : json({ error: "Nobody has that name." }, 404);
+    return n ? json(n) : json({ error: "Nobody has that username." }, 404);
   }
 
   if (what === "freename" && req.method === "POST") {
-    return (await freeName(b.name)) ? json({ ok: true }) : json({ error: "Nobody has that name." }, 404);
+    return (await freeName(b.name, !!b.hold)) ? json({ ok: true }) : json({ error: "Nobody has that username." }, 404);
   }
 
   if (what === "blocked" && req.method === "GET") {

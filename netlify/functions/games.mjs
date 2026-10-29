@@ -19,7 +19,7 @@
 
 import { getStore } from "@netlify/blobs";
 import { check } from "../lib/standing.mjs";
-import { claimName } from "../lib/names.mjs";
+import { checkName } from "../lib/names.mjs";
 
 const STALE_MS = 5 * 60 * 1000;   // not heard from in 5 minutes: gone
 const GENRES = ["Obby", "Adventure", "Roleplay", "Fighting", "Shooter", "Racing", "Simulator", "Horror", "Puzzle", "Sandbox", "Hangout", "Other"];
@@ -78,11 +78,10 @@ export default async (req, context) => {
     if (b.device) {
       const st = await check(String(b.device).toLowerCase(), clean(b.name, 24), String(context.ip ?? ""));
       if (st.blocked) return refused(st);
-      // the host's name is theirs (names have one owner each: lib/names.mjs)
+      // the host's name is their username (one owner each, can't be changed: lib/names.mjs)
       if (b.claim) {
-        const r = await claimName(b.device, b.key, b.name, String(context.ip ?? ""));
-        if (r.error) return json({ error: r.error, name: true }, r.status === 400 ? 400 : 409);
-        nameKey = r.key || "";
+        const why = await checkName(b.device, b.key, b.name);
+        if (why) return json({ error: why, name: true }, 409);
       }
     }
     // blocked in the admin panel (admin.mjs): this PC can't list games
