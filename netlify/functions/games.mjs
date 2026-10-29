@@ -127,6 +127,7 @@ export default async (req, context) => {
       desc: clean(b.desc, 120),
       genre: GENRES.includes(b.genre) ? b.genre : "",
       thumb: !!(old && old.thumb),
+      private: !!b.private,   // (invite-only: not in the list; joined with its code)
       updated: Date.now(),
     };
     await store.setJSON(code, game);
@@ -140,7 +141,7 @@ export default async (req, context) => {
       const g = await store.get(key, { type: "json" });
       if (!g) continue;
       if (now - g.updated > STALE_MS) { await store.delete(key); await thumbs().delete(key); continue; }   // (tidy up as we go)
-      list.push(pub(g));
+      if (!g.private) list.push(pub(g));
     }
     list.sort((a, b) => b.players - a.players);
     return json({ games: list.slice(0, 50) });

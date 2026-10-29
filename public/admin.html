@@ -166,7 +166,7 @@ async function load () {
     $("count").textContent = "(" + g.games.length + ")";
     $("games").innerHTML = g.games.length ? g.games.map((x) =>
       `<tr><td>${x.thumb ? `<img src="/api/thumb?c=${encodeURIComponent(x.code)}" alt="" style="width:120px;display:block;margin-bottom:4px;border:1px solid #444">` : ""}` +
-      `${esc(x.game)}${x.genre ? ` <span class="tag">${esc(x.genre)}</span>` : ""}${x.desc ? `<br><span class="note">${esc(x.desc)}</span>` : ""}</td>` +
+      `${esc(x.game)}${x.genre ? ` <span class="tag">${esc(x.genre)}</span>` : ""}${x.private ? ' <span class="tag">invite-only</span>' : ""}${x.desc ? `<br><span class="note">${esc(x.desc)}</span>` : ""}</td>` +
       `<td>${esc(x.host)}</td><td>${x.players}/${x.max}</td><td><code>${esc(x.code)}</code></td>` +
       `<td class="wide dim">${ago(x.started)}</td>` +
       `<td><button data-del="${esc(x.code)}">Delete</button><button class="bad" data-block="${esc(x.code)}">Block</button></td></tr>`).join("")

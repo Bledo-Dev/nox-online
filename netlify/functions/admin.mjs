@@ -135,7 +135,7 @@ export default async (req, context) => {
     const list = [];
     for (const { key } of blobs.slice(0, 300)) {
       const g = await games.get(key, { type: "json" });
-      if (g) list.push({ code: g.code, game: g.game, host: g.name, players: g.players, max: g.max, desc: g.desc || "", genre: g.genre || "", thumb: !!g.thumb,
+      if (g) list.push({ code: g.code, game: g.game, host: g.name, players: g.players, max: g.max, desc: g.desc || "", genre: g.genre || "", thumb: !!g.thumb, private: !!g.private,
                          url: g.url || "", ip: g.ip, port: g.port, from: g.from || "", started: g.started || 0, updated: g.updated });
     }
     list.sort((a, b) => b.updated - a.updated);
