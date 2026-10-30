@@ -20,6 +20,7 @@
 import { getStore } from "@netlify/blobs";
 import { check } from "../lib/standing.mjs";
 import { checkName } from "../lib/names.mjs";
+import { setPlaying } from "../lib/presence.mjs";
 
 const STALE_MS = 5 * 60 * 1000;   // not heard from in 5 minutes: gone
 const GENRES = ["Obby", "Adventure", "Roleplay", "Fighting", "Shooter", "Racing", "Simulator", "Horror", "Puzzle", "Sandbox", "Hangout", "Other"];
@@ -62,7 +63,10 @@ export default async (req, context) => {
     // a host that stops: take its game off the list
     if (b.stop && b.code && b.token) {
       const old = await store.get(String(b.code), { type: "json" });
-      if (old && old.token === b.token) { await store.delete(String(b.code)); await thumbs().delete(String(b.code)); }
+      if (old && old.token === b.token) {
+        await store.delete(String(b.code)); await thumbs().delete(String(b.code));
+        if (old.claimed && old.name) await setPlaying(old.name, null);   // (not playing it anymore)
+      }
       return json({ ok: true });
     }
 
@@ -74,15 +78,15 @@ export default async (req, context) => {
     if (port < 1 || port > 65535) return json({ error: "bad port" }, 400);
 
     // timed out or banned: no hosting
-    let nameKey = "";
-    if (b.device) {
+    let nameKey = "", hostName = "";
+    if (!b.device || !b.claim) return json({ error: "Update Nox to host games online." }, 400);
+    {
       const st = await check(String(b.device).toLowerCase(), clean(b.name, 24), String(context.ip ?? ""));
       if (st.blocked) return refused(st);
       // the host's name is their username (one owner each, can't be changed: lib/names.mjs)
-      if (b.claim) {
-        const why = await checkName(b.device, b.key, b.name);
-        if (why) return json({ error: why, name: true }, 409);
-      }
+      const why = await checkName(b.device, b.key, b.name);
+      if (why) return json({ error: why, name: true }, 409);
+      hostName = clean(b.name, 24);
     }
     // blocked in the admin panel (admin.mjs): this PC can't list games
     const from = String(context.ip ?? "");
@@ -126,10 +130,13 @@ export default async (req, context) => {
       desc: clean(b.desc, 120),
       genre: GENRES.includes(b.genre) ? b.genre : "",
       thumb: !!(old && old.thumb),
-      private: !!b.private,   // (invite-only: not in the list; joined with its code)
+      private: !!b.private,   // (invite-only or friends-only: not in the list; joined with its code)
+      friends: !!b.friends,   // (friends-only: the host's friends see its code)
+      claimed: !!hostName,    // (the name is the host's own username)
       updated: Date.now(),
     };
     await store.setJSON(code, game);
+    if (hostName) await setPlaying(hostName, game.game, code, game);   // (its friends see it: lib/presence.mjs)
     return json(nameKey ? { code, token, ip, port, url, key: nameKey } : { code, token, ip, port, url });
   }
 

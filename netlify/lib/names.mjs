@@ -11,7 +11,8 @@
 
 import { getStore } from "@netlify/blobs";
 import { createHash, randomBytes } from "node:crypto";
-import { check, isDevice } from "./standing.mjs";
+import { check, hashIp, isDevice } from "./standing.mjs";
+import { allow } from "./limits.mjs";
 
 const RESERVED = ["nox", "noxteam", "nox_team", "noxadmin", "admin", "administrator", "moderator", "mod", "owner",
   "system", "server", "staff", "support", "bitform", "bitformstudio", "host", "player", "guest", "everyone", "you"];
@@ -49,7 +50,12 @@ async function mine (s, device, key) {
   const dev = await s.get(`d-${device}`, { type: "json" });
   if (dev && dev.keyHash && (!key || hash(key) !== dev.keyHash))
     return { error: "This copy of Nox lost its name key (nox_name.txt), so it can't use this device's username. Ask the Nox team.", status: 403 };
-  return { ok: true, name: (dev && dev.username) || "", dev };
+  let name = (dev && dev.username) || "";
+  if (name) {   // (the username's own record has to say this device too)
+    const u = await s.get(`u-${name.toLowerCase()}`, { type: "json" });
+    if (!u || u.held || u.device !== device) name = "";
+  }
+  return { ok: true, name, dev };
 }
 
 // pick a username for a device (only once), or with name "" just say what it is.
@@ -72,9 +78,16 @@ export async function claimName (device, key, name, ip) {
   const st = await check(device, name, ip);
   if (st.blocked) return { error: st.message, status: 403 };
   if (await s.get(`u-${low}`)) return { error: `The username ${name} is taken. Pick another.`, status: 409 };
+  if (!(await allow([`cl-i-${hashIp(String(ip || ""))}`, `cl-d-${device}`], 10))) return { error: "Too many tries for now. Try again later.", status: 429 };
   const newKey = m.dev && m.dev.keyHash ? "" : randomBytes(24).toString("hex");
+  const keyHash = newKey ? hash(newKey) : m.dev.keyHash;
   await s.setJSON(`u-${low}`, { username: name, device, at: Date.now() });
-  await s.setJSON(`d-${device}`, { username: name, keyHash: newKey ? hash(newKey) : m.dev.keyHash, at: Date.now() });
+  await s.setJSON(`d-${device}`, { username: name, keyHash, at: Date.now() });
+  const u = await s.get(`u-${low}`, { type: "json" });   // (someone else at the same moment: the later one has it)
+  if (!u || u.device !== device) {
+    await s.setJSON(`d-${device}`, { username: "", keyHash: (m.dev && m.dev.keyHash) || "", at: Date.now() });   // (as before)
+    return { error: `The username ${name} is taken. Pick another.`, status: 409 };
+  }
   return newKey ? { ok: true, name, key: newKey } : { ok: true, name };
 }
 
@@ -87,6 +100,24 @@ export async function checkName (device, key, name) {
   if (!m.name) return "Pick your username in the Nox app first (Settings).";
   if (m.name.toLowerCase() !== String(name || "").toLowerCase()) return `This device's username is ${m.name}.`;
   return "";
+}
+
+// who this device is: its username, proven by its name key. -> { name } or { error, status }
+export async function whoIs (device, key) {
+  device = String(device || "").toLowerCase();
+  if (!isDevice(device)) return { error: "bad request", status: 400 };
+  const m = await mine(store(), device, String(key || ""));
+  if (m.error) return m;
+  if (!m.name) return { error: "Pick your username in the Nox app first (Settings).", status: 403 };
+  return { name: m.name, device };
+}
+
+// a username as its owner spelled it ("" if nobody has it)
+export async function realName (name) {
+  name = String(name || "");
+  if (!validName(name)) return "";
+  const n = await store().get(`u-${name.toLowerCase()}`, { type: "json" });
+  return n && !n.held && n.username ? n.username : "";
 }
 
 export async function nameInfo (name) {
@@ -104,5 +135,19 @@ export async function freeName (name, hold) {
   else await s.delete(`u-${low}`);
   // (its key goes too: that device starts fresh, which also helps someone who lost nox_name.txt)
   if (n.device) await s.setJSON(`d-${n.device}`, { username: "", keyHash: "", at: Date.now() });
+  // its friends and what it was playing go too (whoever has this username next starts with none)
+  const fs = getStore({ name: "friends", consistency: "strong" });
+  const f = await fs.get(`f-${low}`, { type: "json" });
+  if (f) {
+    const others = new Set([...(f.friends || []), ...(f.incoming || []), ...(f.outgoing || [])].map((x) => String(x).toLowerCase()));
+    for (const o of others) {
+      const r = await fs.get(`f-${o}`, { type: "json" });
+      if (!r) continue;
+      for (const k of ["friends", "incoming", "outgoing"]) r[k] = (r[k] || []).filter((x) => String(x).toLowerCase() !== low);
+      await fs.setJSON(`f-${o}`, r);
+    }
+    await fs.delete(`f-${low}`);
+  }
+  await getStore({ name: "presence", consistency: "strong" }).delete(`p-${low}`);
   return true;
 }
