@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nox Docs</title>
+<link rel="icon" href="/favicon.png">
+<style>
+body{font-family:system-ui,sans-serif;background:#1c1c1f;color:#ddd;max-width:820px;margin:40px auto;padding:0 16px;line-height:1.55}
+h1{color:#fff;margin:0;font-size:36px}h2{color:#fff;font-size:24px;margin:44px 0 8px;padding-top:8px;border-top:1px solid #34343a}
+h3{color:#f2c94c;font-size:17px;margin:26px 0 6px}
+a{color:#f2c94c}.dim{color:#999}.top{display:flex;gap:16px;align-items:center;margin-bottom:22px}
+.top img{width:60px;height:60px}
+.toc{background:#26262b;border:1px solid #34343a;padding:12px 18px;margin:14px 0}
+.toc a{margin-right:14px;white-space:nowrap}
+code{background:#2c2c32;padding:1px 5px;border-radius:3px;font-size:14px}
+pre{background:#141416;border:1px solid #34343a;padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45}
+pre code{background:none;padding:0}
+table{border-collapse:collapse;width:100%;margin:8px 0 14px;font-size:15px;display:block;overflow-x:auto}
+td,th{border:1px solid #34343a;padding:5px 9px;text-align:left;vertical-align:top}th{background:#26262b;color:#fff}
+.note{background:#2a2618;border-left:3px solid #f2c94c;padding:8px 14px;margin:12px 0}
+ol li,ul li{margin:3px 0}
+footer{margin:48px 0 20px;font-size:14px}
+</style></head>
+<body>
+<div class="top"><a href="/"><img src="/icon.png" alt="Nox"></a><div><h1>Nox Docs</h1><div class="dim">Making games with Nox Studio and the Nox language.</div></div></div>
+
+<div class="toc">
+  <a href="#start">Getting started</a>
+  <a href="#obby">Your first obby</a>
+  <a href="#roblox">Coming from Roblox</a>
+  <a href="#scripts">How scripts run</a>
+  <a href="#services">Services</a>
+  <a href="#classes">Classes</a>
+  <a href="#types">Datatypes</a>
+  <a href="#examples">Examples</a>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="start">Getting started</h2>
+
+<p>Nox Studio is where you build games. It works a lot like Roblox Studio: you place parts in a 3D world, change them in the
+Properties panel, and add scripts written in the Nox language (Lua-based, very close to Luau).</p>
+
+<h3>Opening Studio</h3>
+<ol>
+  <li>Open <b>noxstudio.exe</b>.</li>
+  <li>Under <b>New game</b>, type a name, pick <b>3D</b> or <b>2D</b>, and create it. Your games are listed under <b>Your games</b>, so you can open them again later.</li>
+  <li>A new game starts with a baseplate and a spawn point.</li>
+</ol>
+
+<h3>The Studio window</h3>
+<ul>
+  <li><b>Home / Model / Script / Test</b> tabs at the top, with tools like Select, Move, Scale, Rotate, Part and Script.</li>
+  <li><b>Explorer</b> (right): everything in your game, as a tree.</li>
+  <li><b>Properties</b> (under it): the selected thing's settings, like Color, Size and Anchored.</li>
+  <li><b>Output</b> (bottom): prints and errors from your scripts.</li>
+  <li><b>Play</b> (the blue triangle, or F5) tests the game. <b>Stop</b> or closing the game window brings you back.</li>
+</ul>
+
+<h3>Saving, sharing, publishing</h3>
+<ul>
+  <li><b>Ctrl+S</b> saves. Your game is a folder in Studio's <code>games</code> folder (World.json plus your scripts and files).</li>
+  <li><b>Publish</b> (top right) hosts the game live from your PC so others can join with the Nox app. Players need the
+      <a href="/">Nox app</a>. You can make games friends-only, invite-only or open to everyone.</li>
+  <li><b>File &gt; Export game</b> makes your own <b>.exe</b>: one file with the whole game inside, that you can share anywhere.
+      Export also saves <code>THIRD_PARTY_NOTICES.txt</code> next to it; share that with your game.</li>
+</ul>
+
+<h3>Handy keys</h3>
+<table>
+<tr><td>1 / 2 / 3 / 4</td><td>Select, Move, Scale, Rotate</td></tr>
+<tr><td>Ctrl+D, Del, Ctrl+G</td><td>Duplicate, delete, group into a Model</td></tr>
+<tr><td>Ctrl+Z / Ctrl+Y</td><td>Undo / redo</td></tr>
+<tr><td>F5 / Shift+F5</td><td>Play / stop</td></tr>
+<tr><td>Right-drag, WASD, Q / E, wheel</td><td>Look around, fly, down / up, zoom</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="obby">Your first obby</h2>
+<p>About 10 minutes. You'll make some platforms, a lava floor that kills you, and a moving platform.</p>
+
+<h3>1. Platforms</h3>
+<ol>
+  <li>On the <b>Home</b> tab, click <b>Part</b>. A grey block appears.</li>
+  <li>Use <b>Move (2)</b> and <b>Scale (3)</b> to make it a platform, and drag it into place.</li>
+  <li>In <b>Properties</b>, tick <b>Anchored</b>, or it will fall when you play.</li>
+  <li><b>Ctrl+D</b> to copy it, then move the copy to make a path of jumps.</li>
+</ol>
+
+<h3>2. Lava</h3>
+<ol>
+  <li>Add another Part, make it big and flat under your platforms, and anchor it.</li>
+  <li>In Properties, rename it <b>Lava</b> and set its <b>Color</b> to orange (click the color swatch).</li>
+  <li>Select Lava, then click <b>Script</b> on the Home tab. A script is added inside Lava and opens in the editor.</li>
+  <li>Type this:</li>
+</ol>
+<pre><code>local lava = script.Parent
+
+lava.Touched:Connect(function(hit)
+  local humanoid = hit.Parent:FindFirstChild("Humanoid")
+  if humanoid then
+    humanoid.Health = 0
+  end
+end)</code></pre>
+<p>Press <b>F5</b> and jump in the lava. You'll respawn after a moment.</p>
+
+<h3>3. A moving platform</h3>
+<p>Name one of your platforms <b>Mover</b>. Click on empty space (so nothing is selected) and click <b>Script</b>: it goes into
+<b>ServerScripts</b>. Type:</p>
+<pre><code>local Loop = game:GetService("Loop")
+local mover = world:WaitForChild("Mover")
+local start = mover.Position
+local t = 0
+
+Loop.Heartbeat:Connect(function(dt)
+  t = t + dt
+  mover.Position = start + Vector3.new(0, 0, math.sin(t) * 8)
+end)</code></pre>
+<p>Play again: the platform slides back and forth. Save with <b>Ctrl+S</b>, then try <b>Publish</b> and join from the Nox app.</p>
+
+<div class="note">Tip: the 3D Model view (Model tab, <b>3D Model</b>) lets you make your own meshes, like guns, props or characters, without leaving Studio.</div>
+
+<!-- ============================================================ -->
+<h2 id="roblox">Coming from Roblox</h2>
+<p>Most of what you know carries over: <code>Instance.new</code>, <code>:Connect</code>, <code>FindFirstChild</code>,
+<code>Vector3</code>, <code>CFrame</code>, tweens, GUIs. The main differences:</p>
+
+<h3>Different service names</h3>
+<p><code>game:GetService</code> only takes the Nox names. The Roblox names don't work.</p>
+<table>
+<tr><th>Nox</th><th>Roblox</th><th>Nox</th><th>Roblox</th></tr>
+<tr><td>World (global <code>world</code>)</td><td>Workspace (<code>workspace</code>)</td><td>Loop</td><td>RunService</td></tr>
+<tr><td>Environment</td><td>Lighting</td><td>Tweens</td><td>TweenService</td></tr>
+<tr><td>Shared</td><td>ReplicatedStorage</td><td>Input</td><td>UserInputService</td></tr>
+<tr><td>ServerScripts</td><td>ServerScriptService</td><td>Actions</td><td>ContextActionService</td></tr>
+<tr><td>ServerOnly</td><td>ServerStorage</td><td>Cleanup</td><td>Debris</td></tr>
+<tr><td>Screens</td><td>StarterGui</td><td>Tags</td><td>CollectionService</td></tr>
+<tr><td>StartingTools</td><td>StarterPack</td><td>Web</td><td>HttpService (JSON only)</td></tr>
+<tr><td>PlayerSetup</td><td>StarterPlayer</td><td>Prompts</td><td>ProximityPromptService</td></tr>
+<tr><td>Audio</td><td>SoundService</td><td>Pathfinding</td><td>PathfindingService</td></tr>
+<tr><td>Chat</td><td>TextChatService</td><td>Players, Teams</td><td>(same)</td></tr>
+</table>
+
+<h3>Language differences</h3>
+<p>Nox is Lua 5.5 with some Luau favorites added: <code>x += 1</code> (also <code>-= *= /= //= %= ^= ..=</code>) and <code>continue</code> work like in Luau. These Luau extras are <b>not</b> supported:</p>
+<table>
+<tr><th>Luau</th><th>Write this in Nox</th></tr>
+<tr><td><code>local x: number = 5</code></td><td><code>local x = 5</code> (no type annotations)</td></tr>
+<tr><td><code>`Hi {name}`</code></td><td><code>"Hi " .. name</code></td></tr>
+<tr><td><code>if a then b else c</code> (expression)</td><td><code>a and b or c</code></td></tr>
+<tr><td><code>for k, v in t do</code></td><td><code>for k, v in pairs(t) do</code></td></tr>
+<tr><td><code>table.find</code>, <code>table.clear</code>, <code>table.clone</code></td><td>write a small loop</td></tr>
+<tr><td><code>math.clamp</code>, <code>math.round</code>, <code>math.sign</code></td><td><code>math.max(lo, math.min(hi, x))</code>, <code>math.floor(x + 0.5)</code></td></tr>
+<tr><td><code>string.split</code></td><td><code>string.gmatch</code></td></tr>
+</table>
+<p>Nox has some things Luau doesn't: <code>//</code> (whole-number division), bitwise <code>&amp; | ~ &lt;&lt; &gt;&gt;</code>, and <code>goto</code>.
+Note that <code>tick()</code> gives whole seconds; use <code>time()</code> or <code>os.clock()</code> for timing.</p>
+
+<h3>Other differences</h3>
+<ul>
+  <li><b>Files, not asset IDs.</b> Sounds, images and meshes are files in your game folder: <code>sound.SoundId = "sounds/coin.wav"</code>.</li>
+  <li><b>No data saving yet.</b> There's no DataStore; <code>Saves</code> exists but does nothing yet.</li>
+  <li><b>No web requests</b> from game scripts. <code>Web:JSONEncode</code>/<code>JSONDecode</code> work.</li>
+  <li><b>One computer per game.</b> Each player runs the game's scripts on their own computer; Nox shares players' movement,
+      avatars and chat. RemoteEvents work, but only on the same computer (FireServer reaches OnServerEvent locally).</li>
+  <li><b>The character</b> is a Model with <code>Humanoid</code> and <code>HumanoidRootPart</code>. In <code>Touched</code>,
+      <code>hit</code> is the HumanoidRootPart, so <code>hit.Parent</code> is the character.</li>
+  <li>Scripts come from <code>.nox</code> files; a Script made with <code>Instance.new</code> doesn't run.</li>
+  <li>GUI <code>BorderSizePixel</code> defaults to 0.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="scripts">How scripts run</h2>
+<table>
+<tr><th>Type</th><th>Runs when it's in</th></tr>
+<tr><td>Script</td><td>World or ServerScripts (at game start)</td></tr>
+<tr><td>LocalScript</td><td>PlayerSetup.PlayerScripts, PlayerSetup.CharacterScripts (copied into each character), a GUI in Screens, or a Tool</td></tr>
+<tr><td>ModuleScript</td><td>only when you <code>require()</code> it</td></tr>
+</table>
+<p>Scripts in <b>Shared</b> and <b>ServerOnly</b> don't run; those are storage. A script that runs 10 seconds without waiting is stopped.</p>
+
+<h3>Globals</h3>
+<p><code>game</code>, <code>world</code>, <code>script</code>, <code>require</code>, <code>print</code>, <code>warn</code>,
+<code>wait</code>, <code>task</code> (<code>spawn</code>, <code>defer</code>, <code>delay</code>, <code>wait</code>, <code>cancel</code>),
+<code>spawn</code>, <code>delay</code>, <code>time</code>, <code>tick</code>, <code>typeof</code>, <code>_G</code>/<code>shared</code>,
+the datatypes below, and Lua's <code>string</code>, <code>table</code>, <code>math</code>, <code>utf8</code>, <code>coroutine</code>
+and <code>os</code> (time, clock, date, difftime only).</p>
+<p>Not available to game scripts, for safety: files (<code>io</code>), <code>load</code>, <code>debug</code>, <code>package</code>.</p>
+
+<h3>Events</h3>
+<pre><code>local conn = part.Touched:Connect(function(hit) ... end)
+conn:Disconnect()
+part.Touched:Once(function(hit) ... end)
+local hit = part.Touched:Wait()</code></pre>
+
+<!-- ============================================================ -->
+<h2 id="services">Services</h2>
+<p>Get them with <code>game:GetService("Name")</code>.</p>
+
+<h3>World</h3>
+<p><code>Gravity</code>, <code>CurrentCamera</code>, <code>FallenPartsDestroyHeight</code>, <code>Mode2D</code>.
+<code>:Raycast(origin, direction, params?)</code> returns <code>Instance</code>, <code>Position</code>, <code>Normal</code>, <code>Distance</code>.
+<code>:GetPartBoundsInRadius(pos, r, params?)</code>, <code>:GetPartBoundsInBox(cf, size, params?)</code>, <code>:GetPartsInPart(part)</code>.
+If the game has terrain: <code>world.Terrain:GetHeight(x, z)</code>.</p>
+
+<h3>Players</h3>
+<p><code>LocalPlayer</code>, <code>:GetPlayers()</code>, <code>:GetPlayerFromCharacter(model)</code>; events <code>PlayerAdded</code>, <code>PlayerRemoving</code>.<br>
+A Player has <code>Name</code>, <code>DisplayName</code>, <code>UserId</code>, <code>Team</code>, <code>Character</code>,
+<code>PlayerGui</code>, <code>Backpack</code>; <code>:LoadCharacter()</code>, <code>:Kick(msg)</code>, <code>:GetMouse()</code>;
+events <code>CharacterAdded</code>, <code>Chatted</code>. A <code>leaderstats</code> Folder with value objects shows in the player list.</p>
+
+<h3>Loop</h3>
+<p>Events <code>Heartbeat(dt)</code>, <code>RenderStepped(dt)</code>, <code>Stepped(time, dt)</code>;
+<code>:BindToRenderStep(name, priority, fn)</code>, <code>:UnbindFromRenderStep(name)</code>.</p>
+
+<h3>Tweens</h3>
+<pre><code>local Tweens = game:GetService("Tweens")
+local tween = Tweens:Create(part, TweenInfo.new(1, Enum.EasingStyle.Quad), { Position = Vector3.new(0, 10, 0) })
+tween:Play()
+tween.Completed:Wait()</code></pre>
+<p>Tweens numbers, Vector3, Color3, CFrame, UDim2, UDim, Vector2 and NumberRange.</p>
+
+<h3>Input and Actions</h3>
+<p><b>Input</b>: events <code>InputBegan(input, busy)</code>, <code>InputEnded</code>, <code>InputChanged</code>, <code>JumpRequest</code>;
+<code>:IsKeyDown(Enum.KeyCode.X)</code>, <code>:GetMouseLocation()</code>, <code>MouseBehavior</code>.<br>
+<b>Actions</b>: <code>:BindAction(name, fn, false, Enum.KeyCode.E)</code>, <code>:UnbindAction(name)</code>.</p>
+
+<h3>Environment</h3>
+<p><code>ClockTime</code>, <code>TimeOfDay</code>, <code>Brightness</code>, <code>Ambient</code>, <code>OutdoorAmbient</code>,
+<code>FogColor</code>, <code>FogStart</code>, <code>FogEnd</code>, <code>GlobalShadows</code>, <code>RealisticGraphics</code>, <code>UltraGraphics</code>.
+Put Sky, Atmosphere and post effects (Bloom, Blur, ColorCorrection, SunRays, DepthOfField) inside it.</p>
+
+<h3>Others</h3>
+<table>
+<tr><td>Cleanup</td><td><code>:AddItem(instance, seconds)</code></td></tr>
+<tr><td>Tags</td><td><code>:AddTag</code>, <code>:RemoveTag</code>, <code>:HasTag</code>, <code>:GetTagged(tag)</code>, <code>:GetInstanceAddedSignal(tag)</code></td></tr>
+<tr><td>Web</td><td><code>:JSONEncode(t)</code>, <code>:JSONDecode(s)</code>, <code>:GenerateGUID()</code>, <code>:UrlEncode(s)</code></td></tr>
+<tr><td>Pathfinding</td><td><code>:CreatePath()</code>, then <code>path:ComputeAsync(a, b)</code>, <code>path:GetWaypoints()</code></td></tr>
+<tr><td>Screens</td><td><code>:SetCoreGuiEnabled(Enum.CoreGuiType.Chat, false)</code>, <code>:SetCore("SendNotification", {Title=..., Text=...})</code></td></tr>
+<tr><td>Chat</td><td><code>TextChannels.RBXGeneral:DisplaySystemMessage(text)</code>; TextChatCommand for /commands</td></tr>
+<tr><td>Teams</td><td><code>:GetTeams()</code>; players are auto-assigned to AutoAssignable teams</td></tr>
+<tr><td>Prompts</td><td>event <code>PromptTriggered(prompt, player)</code></td></tr>
+<tr><td>PlayerSetup</td><td>controls, built-in UI switches, window and export settings (also in File &gt; Settings)</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="classes">Classes</h2>
+<p>Every object has <code>Name</code>, <code>Parent</code>, <code>ClassName</code>, <code>:Destroy()</code>, <code>:Clone()</code>,
+<code>:FindFirstChild(name)</code>, <code>:WaitForChild(name)</code>, <code>:GetChildren()</code>, <code>:GetDescendants()</code>,
+<code>:IsA(class)</code>, <code>:SetAttribute</code>/<code>:GetAttribute</code>, <code>:GetPropertyChangedSignal(prop)</code>,
+and events <code>ChildAdded</code>, <code>ChildRemoved</code>, <code>Changed</code>, <code>Destroying</code>.
+Make new ones with <code>Instance.new("Part", parent)</code>.</p>
+
+<h3>Parts</h3>
+<p>Part, SpawnLocation, WedgePart, CornerWedgePart, TrussPart (climbable), MeshPart (<code>MeshId</code> = a .obj/.gltf/.glb file),
+Seat, VehicleSeat, and <b>Sprite</b> (a flat picture, for 2D games).</p>
+<p>Properties: <code>Position</code>, <code>Size</code>, <code>Orientation</code>, <code>CFrame</code>, <code>Color</code>, <code>BrickColor</code>,
+<code>Transparency</code>, <code>Reflectance</code>, <code>Material</code>, <code>Shape</code>, <code>Anchored</code>, <code>CanCollide</code>,
+<code>CanTouch</code>, <code>CastShadow</code>, <code>AssemblyLinearVelocity</code>.
+Methods: <code>:ApplyImpulse(v)</code>, <code>:GetTouchingParts()</code>, <code>:PivotTo(cf)</code>. Event: <code>Touched(hit)</code>.</p>
+<div class="note">Balls and cylinders collide as boxes for now. <code>Touched</code> fires for characters and NPCs walking into a part, and for a held Tool's parts.</div>
+
+<h3>Models and values</h3>
+<p><b>Model</b>: <code>PrimaryPart</code>, <code>:GetPivot()</code>, <code>:PivotTo(cf)</code>, <code>:MoveTo(pos)</code>, <code>:GetBoundingBox()</code>, <code>:ScaleTo(n)</code>.
+<b>Folder</b>, <b>Configuration</b>.<br>
+Values: StringValue, NumberValue, IntValue, BoolValue, Vector3Value, Color3Value, ObjectValue, CFrameValue (<code>Value</code>, <code>Changed</code>).<br>
+BindableEvent (<code>:Fire</code>, <code>Event</code>), BindableFunction, RemoteEvent, RemoteFunction (local only, see above).</p>
+
+<h3>Characters and NPCs</h3>
+<p><b>Humanoid</b>: <code>Health</code>, <code>MaxHealth</code>, <code>WalkSpeed</code> (16), <code>JumpPower</code> (50), <code>DisplayName</code>;
+<code>:TakeDamage(n)</code>, <code>:MoveTo(pos)</code>, <code>:EquipTool(tool)</code>, <code>:LoadAnimation(anim)</code>;
+events <code>Died</code>, <code>HealthChanged</code>, <code>Running</code>, <code>Jumping</code>, <code>MoveToFinished</code>.
+An NPC is a Model with a <code>Humanoid</code> and a <code>HumanoidRootPart</code>.</p>
+<div class="note">If a script raises WalkSpeed or JumpPower, also raise <code>PlayerSetup.MaxWalkSpeed</code> / <code>MaxJumpPower</code>,
+or multiplayer movement checks pull players back.</div>
+<p><b>Tool</b> (put it in StartingTools): <code>Activated</code>, <code>Equipped</code>, <code>Unequipped</code>; needs a part named <code>Handle</code>.
+<b>Animation</b>: <code>AnimationId</code> can be <code>"nox://wave"</code>, <code>"nox://dance"</code>, <code>"nox://point"</code>,
+<code>"nox://cheer"</code>, <code>"nox://sit"</code>, or a file. Also ForceField, Accessory, Shirt, Pants, BodyColors.</p>
+
+<h3>Sound, light and effects</h3>
+<p><b>Sound</b>: <code>SoundId</code> (a .wav/.ogg/.mp3 file), <code>Volume</code>, <code>Looped</code>, <code>:Play()</code>, <code>:Stop()</code>, <code>Ended</code>. Inside a part, it fades with distance.<br>
+Lights: PointLight, SpotLight, SurfaceLight. Effects: ParticleEmitter, Fire, Smoke, Sparkles, Explosion, Beam, Trail, Highlight. Decal, Texture.</p>
+
+<h3>Interaction and physics</h3>
+<p>ClickDetector (<code>MouseClick(player)</code>), ProximityPrompt (<code>Triggered(player)</code>), Dialog.
+Attachment, Weld, WeldConstraint, HingeConstraint, RopeConstraint, SpringConstraint, RodConstraint, AlignPosition,
+AlignOrientation, LinearVelocity, AngularVelocity.</p>
+
+<h3>GUI</h3>
+<p>ScreenGui (put it in Screens), BillboardGui, SurfaceGui, Frame, ScrollingFrame, TextLabel, TextButton, TextBox, ImageLabel,
+ImageButton, ViewportFrame, and UIListLayout, UIGridLayout, UICorner, UIStroke, UIGradient, UIPadding, UIScale, UIAspectRatioConstraint.
+Buttons: <code>MouseButton1Click</code>, <code>Activated</code>. TextBox: <code>FocusLost(enterPressed)</code>.</p>
+
+<!-- ============================================================ -->
+<h2 id="types">Datatypes</h2>
+<table>
+<tr><td>Vector3</td><td><code>Vector3.new(x, y, z)</code>; <code>X Y Z</code>, <code>Magnitude</code>, <code>Unit</code>; <code>:Dot</code>, <code>:Cross</code>, <code>:Lerp</code>; <code>+ - * /</code></td></tr>
+<tr><td>CFrame</td><td><code>CFrame.new(pos)</code>, <code>CFrame.new(pos, lookAt)</code>, <code>CFrame.Angles(rx, ry, rz)</code>, <code>CFrame.lookAt</code>; <code>Position</code>, <code>LookVector</code>, <code>RightVector</code>, <code>UpVector</code>; <code>:Inverse</code>, <code>:Lerp</code>, <code>:ToWorldSpace</code>, <code>:ToObjectSpace</code></td></tr>
+<tr><td>Color3</td><td><code>Color3.new(r, g, b)</code> (0-1), <code>Color3.fromRGB(255, 0, 0)</code>, <code>Color3.fromHSV</code>, <code>Color3.fromHex("#ff8800")</code></td></tr>
+<tr><td>BrickColor</td><td><code>BrickColor.new("Bright red")</code>, <code>BrickColor.random()</code></td></tr>
+<tr><td>UDim2</td><td><code>UDim2.new(xScale, xOffset, yScale, yOffset)</code>, <code>UDim2.fromScale</code>, <code>UDim2.fromOffset</code></td></tr>
+<tr><td>Vector2, UDim</td><td>as in Roblox</td></tr>
+<tr><td>TweenInfo</td><td><code>TweenInfo.new(time, style, direction, repeats, reverses, delay)</code></td></tr>
+<tr><td>Others</td><td>Ray, RaycastParams, Random, NumberRange, NumberSequence, ColorSequence</td></tr>
+<tr><td>Enum</td><td><code>Enum.Material.Neon</code>, <code>Enum.KeyCode.E</code>, <code>Enum.EasingStyle.Quad</code>, ...</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="examples">Examples</h2>
+
+<h3>A coin counter (leaderstats)</h3>
+<pre><code>local player = game:GetService("Players").LocalPlayer
+local stats = Instance.new("Folder")
+stats.Name = "leaderstats"
+stats.Parent = player
+local coins = Instance.new("IntValue")
+coins.Name = "Coins"
+coins.Parent = stats
+
+local coin = world:WaitForChild("Coin")
+coin.Touched:Connect(function(hit)
+  if hit.Parent:FindFirstChild("Humanoid") and coin.Parent then
+    coins.Value = coins.Value + 1
+    coin:Destroy()
+  end
+end)</code></pre>
+
+<h3>A button on screen (LocalScript in a ScreenGui)</h3>
+<pre><code>local gui = script.Parent
+local button = gui:WaitForChild("Panel"):WaitForChild("ClickMe")
+local count = 0
+button.MouseButton1Click:Connect(function()
+  count = count + 1
+  button.Text = "Clicked " .. count .. " times"
+end)</code></pre>
+
+<h3>Press a key</h3>
+<pre><code>local Input = game:GetService("Input")
+local Environment = game:GetService("Environment")
+Input.InputBegan:Connect(function(input, busy)
+  if busy then return end
+  if input.KeyCode == Enum.KeyCode.T then
+    Environment.ClockTime = (Environment.ClockTime + 3) % 24
+  end
+end)</code></pre>
+
+<h3>An NPC walking a route</h3>
+<pre><code>local npc = world:WaitForChild("Bob")
+local hum = npc:WaitForChild("Humanoid")
+local points = { Vector3.new(10, 3, -10), Vector3.new(20, 3, -10), Vector3.new(20, 3, -20) }
+local i = 1
+while hum.Parent do
+  hum:MoveTo(points[i])
+  hum.MoveToFinished:Wait()
+  i = i % #points + 1
+  task.wait(0.5)
+end</code></pre>
+
+<h3>The Nox language on its own</h3>
+<p>The language is open source, with sandboxing, JSON and web requests (those extras are for standalone Nox programs,
+not game scripts): <a href="https://github.com/Bledo-Dev/nox-lang">Nox language on GitHub</a>.</p>
+
+<footer class="dim"><a href="/">Back to Nox</a> · Something wrong or missing in these docs? Tell us.</footer>
+</body></html>
