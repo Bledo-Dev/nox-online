@@ -1,5 +1,5 @@
-// Nox online, on Cloudflare: the pages in public/ are served as they are (free, no limit);
-// only /api/... runs this Worker, which hands each request to its function in netlify/functions.
+// Nox online, on Cloudflare Pages: the pages in public/ are served as they are (free, no limit);
+// only /api/... runs this (through functions/api/[[path]].js), which hands it to its function in netlify/functions.
 // (The folder is still called "netlify": that's where the site first ran.)
 
 import games from "./netlify/functions/games.mjs";

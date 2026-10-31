@@ -2,8 +2,5 @@
   "name": "nox-online",
   "private": true,
   "type": "module",
-  "description": "Nox: the website, and the list of games being hosted (Cloudflare Workers)",
-  "devDependencies": {
-    "wrangler": "^4"
-  }
+  "description": "Nox: the website, and the list of games being hosted (Cloudflare Pages)"
 }
