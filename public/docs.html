@@ -238,7 +238,7 @@ Put Sky, Atmosphere and post effects (Bloom, Blur, ColorCorrection, SunRays, Dep
 <tr><td>Tags</td><td><code>:AddTag</code>, <code>:RemoveTag</code>, <code>:HasTag</code>, <code>:GetTagged(tag)</code>, <code>:GetInstanceAddedSignal(tag)</code></td></tr>
 <tr><td>Web</td><td><code>:JSONEncode(t)</code>, <code>:JSONDecode(s)</code>, <code>:GenerateGUID()</code>, <code>:UrlEncode(s)</code>;
   <code>:GetAsync(url, nocache, headers)</code>, <code>:PostAsync(url, text, contentType, compress, headers)</code>,
-  <code>:RequestAsync({Url, Method, Body, Headers})</code> with the Internet permission</td></tr>
+  <code>:RequestAsync({Url, Method, Body, Headers})</code>, <code>:ConnectWebSocket(url)</code> with the Internet permission</td></tr>
 <tr><td>Saves</td><td><code>:GetDataStore(name)</code>, then <code>:GetAsync(key)</code>, <code>:SetAsync(key, value)</code>,
   <code>:UpdateAsync(key, fn)</code>, <code>:IncrementAsync(key, n)</code>, <code>:RemoveAsync(key)</code></td></tr>
 <tr><td>Links</td><td><code>:Open(url)</code>: asks the player, returns true if they opened it</td></tr>
@@ -258,7 +258,7 @@ Scripts can't change these settings.</p>
 <table>
 <tr><th>Permission</th><th>What it allows</th><th>Players asked?</th></tr>
 <tr><td>Save data</td><td><code>Saves</code>: up to 1 MB per game, kept on the player's device. On for new games.</td><td>No</td></tr>
-<tr><td>Internet</td><td><code>Web:GetAsync</code>, <code>PostAsync</code>, <code>RequestAsync</code>. Websites only (never the player's own
+<tr><td>Internet</td><td><code>Web:GetAsync</code>, <code>PostAsync</code>, <code>RequestAsync</code>, <code>ConnectWebSocket</code>. Websites only (never the player's own
 computer or network), 60 requests a minute, answers up to 1 MB.</td><td>Yes</td></tr>
 <tr><td>Open web pages and copy text</td><td><code>Links:Open</code> and <code>Clipboard:Copy</code>. Each web page is also shown to the player
 before it opens.</td><td>Yes</td></tr>
@@ -290,6 +290,18 @@ end</code></pre>
 print(answer.StatusCode, answer.Body)</code></pre>
 <p>Keys inside a game can be read by anyone who has the game, so only use keys that are meant to be public, or your own
 server in between.</p>
+<h3>WebSockets</h3>
+<p>A WebSocket stays connected to your own server (for example a small Node.js server on a free host), so it can send to
+the game any time. It works through any router, with nothing for players to set up.</p>
+<pre><code>local socket = Web:ConnectWebSocket("wss://my-game-server.example.com/play")   -- waits until it's open
+socket.MessageReceived:Connect(function(text)
+  local msg = Web:JSONDecode(text)
+  print("from the server:", msg.kind)
+end)
+socket.Closed:Connect(function() print("the server went away") end)
+socket:Send(Web:JSONEncode({ kind = "hello", name = game:GetService("Players").LocalPlayer.Name }))</code></pre>
+<p>Messages are text, up to 1 MB each, and a game can have 4 WebSockets open. <code>socket:Close()</code> closes it;
+<code>socket.IsOpen</code> says if it still is.</p>
 
 <!-- ============================================================ -->
 <h2 id="multiplayer">Multiplayer</h2>
