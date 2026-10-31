@@ -262,9 +262,11 @@ Scripts can't change these settings.</p>
 computer or network), 60 requests a minute, answers up to 1 MB.</td><td>Yes</td></tr>
 <tr><td>Open web pages and copy text</td><td><code>Links:Open</code> and <code>Clipboard:Copy</code>. Each web page is also shown to the player
 before it opens.</td><td>Yes</td></tr>
+<tr><td>Play online with other players</td><td><code>Multiplayer:Host</code> and <code>Join</code>. Players you play with can see your
+IP address.</td><td>Yes</td></tr>
 </table>
 <p>When an exported game starts, players see what it wants and can untick anything; the answer is kept for that game
-(delete <code>nox_permissions.txt</code> next to the game to be asked again). In the Nox app, players are asked each time
+(on Windows, delete <code>nox_permissions.txt</code> in <code>%APPDATA%\Nox</code> to be asked again). In the Nox app, players are asked each time
 they join. When you test with Play, everything you ticked is allowed, and test saves are kept apart from players' saves.</p>
 <p>If a player says no, the call errors with a message, so wrap it in <code>pcall</code>:</p>
 <pre><code>local Web = game:GetService("Web")
@@ -325,6 +327,27 @@ coinTaken.OnClientEvent:Connect(function(coinName, who)
   print(who .. " took " .. coinName)
 end)</code></pre>
 <p>Never trust what a player sends: check it on the host, like above.</p>
+
+<h3>Hosting and joining from your game</h3>
+<p>Games played in the Nox app are multiplayer already. An exported game (a Windows .exe, later Steam) can host and join
+by itself with the <b>Multiplayer</b> service and the <b>Play online with other players</b> permission:</p>
+<table>
+<tr><td><code>Multiplayer:Host({ Online = true, MaxPlayers = 8 })</code></td><td>starts hosting and returns the code others join with.
+<code>Online = true</code> gives a 6-letter code that works over the internet; without it, only players on the same Wi-Fi can join.</td></tr>
+<tr><td><code>Multiplayer:Join(code)</code></td><td>joins that game (waits until in; errors if it can't). Both players need the same version of the game.</td></tr>
+<tr><td><code>Multiplayer:Leave()</code></td><td>back to playing alone</td></tr>
+<tr><td><code>Multiplayer.IsHost</code>, <code>.InGame</code>, <code>.IsGuest</code>, <code>.Code</code></td><td>where this player stands</td></tr>
+</table>
+<p>Players who have the Nox app on that computer play with their Nox username and look. Everyone else plays as a guest
+(Guest4821): guests can't use the chat, and can't join private games.</p>
+<pre><code>local MP = game:GetService("Multiplayer")
+hostButton.MouseButton1Click:Connect(function()
+  codeLabel.Text = "Code: " .. MP:Host({ Online = true })
+end)
+joinButton.MouseButton1Click:Connect(function()
+  local ok, err = pcall(function() MP:Join(codeBox.Text) end)
+  if not ok then codeLabel.Text = err end
+end)</code></pre>
 
 <!-- ============================================================ -->
 <h2 id="classes">Classes</h2>
