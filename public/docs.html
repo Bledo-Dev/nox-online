@@ -364,6 +364,15 @@ server.ConnectionAccepted:Connect(function(conn)
   conn.DataReceived:Connect(function(text) conn:Send("you said " .. text) end)
 end)</code></pre>
 
+<h3>Dedicated servers</h3>
+<p>Nox Studio's download has a <code>server</code> folder: <code>noxserver.exe</code> for Windows and <code>noxserver-linux</code>
+for Linux servers. It runs your exported game with no window and no player of its own, as the host, so the game can stay
+online all the time:</p>
+<pre><code>noxserver.exe MyGame.exe --port 47800 --max 16</code></pre>
+<p>Players join with the code it prints, or the server's address and port from the internet (open that port in the server's
+firewall). On the server, <code>Loop:IsServer()</code> is true and <code>Players.LocalPlayer</code> is nil; Scripts run but
+LocalScripts and screens don't. Whatever the game turned on in Permissions is allowed there, and saves are kept on the server.</p>
+
 <h3>Hosting and joining from your game</h3>
 <p>Games played in the Nox app are multiplayer already. An exported game (a Windows .exe, later Steam) can host and join
 by itself with the <b>Multiplayer</b> service and the <b>Play online with other players</b> permission:</p>
