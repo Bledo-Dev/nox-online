@@ -22,7 +22,7 @@ details{margin-top:4px}summary{cursor:pointer;color:#999}.chat{background:#23232
 </style></head>
 <body>
 <h1>Nox admin</h1>
-<p class="dim">Take games off the list, look at reports, time out and ban players, and stop a PC from listing games.</p>
+<p class="dim">Take games off the list, look at reports and bug reports, time out and ban players, and stop a PC from listing games.</p>
 
 <div id="login">
   <label>Username<input id="user" autocomplete="username"></label>
@@ -53,6 +53,11 @@ details{margin-top:4px}summary{cursor:pointer;color:#999}.chat{background:#23232
   <p class="dim">What players reported, with the chat the reporter saw. "People" counts different reporters (the same device or address counts once).</p>
   <table><thead><tr><th>Player</th><th>Why</th><th>People</th><th class="wide">Game</th><th class="wide">When</th><th></th></tr></thead>
   <tbody id="reports"></tbody></table>
+
+  <h2>Bug reports <span class="dim" id="bcount"></span></h2>
+  <p class="dim">Anonymous: nobody's name or device is kept. Show puts one on the public <a href="/bugs.html" style="color:#f2c94c">Bugs page</a> (without its error log).</p>
+  <table><thead><tr><th>#</th><th>Kind</th><th>What happened</th><th class="wide">When</th><th></th></tr></thead>
+  <tbody id="bugs"></tbody></table>
 
   <h2>Timed out and banned <span class="dim" id="scount"></span></h2>
   <p class="dim">Each confirmed report is a strike: 1 a warning, 2 one hour, 3 one day, 4 one week, 5 banned. Unban ends it and sets the strikes back to 0.</p>
@@ -188,6 +193,17 @@ async function load () {
         : `<span class="st-${r.status}">${r.status === "false" ? "false report" : r.status}</span>`}</td></tr>`).join("")
       : `<tr><td colspan="6" class="dim">No reports.</td></tr>`;
     for (const img of document.querySelectorAll("img[data-shotid]")) loadShot(img);
+    const bg = await call("bugs");
+    $("bcount").textContent = "(" + bg.bugs.filter((x) => !x.checked).length + " new)";
+    $("bugs").innerHTML = bg.bugs.length ? bg.bugs.map((x) =>
+      `<tr><td>${x.num}</td><td>${esc(x.kind)}${x.checked ? "" : ' <span class="tag st-pending">new</span>'}${x.shown ? ' <span class="tag">shown</span>' : ""}${x.fixed ? ' <span class="tag">fixed</span>' : ""}<br><span class="dim">${esc(x.where)} ${esc(x.version)}</span></td>` +
+      `<td>${esc(x.text)}${x.log ? `<details><summary>error log</summary><div class="chat">${esc(x.log)}</div></details>` : ""}</td>` +
+      `<td class="wide dim">${ago(x.when)}</td><td>` +
+      (x.shown ? `<button data-bug="${esc(x.id)}" data-act="hide">Hide</button>` : `<button class="go" data-bug="${esc(x.id)}" data-act="show">Show</button>`) +
+      (!x.shown && !x.checked ? `<button data-bug="${esc(x.id)}" data-act="hide" title="Checked, but not on the Bugs page">Keep private</button>` : "") +
+      (x.fixed ? `<button data-bug="${esc(x.id)}" data-act="open">Not fixed</button>` : `<button data-bug="${esc(x.id)}" data-act="fixed">Fixed</button>`) +
+      `<button class="bad" data-bug="${esc(x.id)}" data-act="delete">Delete</button></td></tr>`).join("")
+      : `<tr><td colspan="5" class="dim">No bug reports.</td></tr>`;
     const sd = await call("standing");
     const left = (t) => { const m = Math.max(1, Math.round((t - Date.now()) / 60000)); return m < 60 ? m + " min" : m < 2880 ? Math.round(m / 60) + " h" : Math.round(m / 1440) + " days"; };
     $("scount").textContent = "(" + sd.devices.filter((d) => d.banned || d.until).length + " right now)";
@@ -244,6 +260,10 @@ document.addEventListener("click", async (e) => {
                    (hold ? " Nobody can take this one again." : " Anyone can take this one again."))) return;
       await call("freename", { name: t.dataset.freename, hold });
       $("nres").textContent = held || !hold ? "Done: the username is free." : "Done: reset, and nobody can take it.";
+    }
+    if (t.dataset.bug) {
+      if (t.dataset.act === "delete" && !confirm("Delete this bug report?")) return;
+      await call("bug", { id: t.dataset.bug, action: t.dataset.act }); load();
     }
     if (t.dataset.unflag) { await call("unflag", { device: t.dataset.unflag }); load(); }
     if (t.dataset.untrust) { if (confirm("Remove this trusted device?")) { await call("untrust", { device: t.dataset.untrust }); load(); } }

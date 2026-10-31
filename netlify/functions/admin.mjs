@@ -30,6 +30,8 @@
 //   POST /api/admin/trust    { device, note? }
 //   POST /api/admin/untrust  { device }
 //   POST /api/admin/logout
+//   GET  /api/admin/bugs                             bug reports (anonymous), newest first
+//   POST /api/admin/bug      { id, action }          action: "show" (on /bugs.html), "hide", "fixed", "open", "delete"
 
 import { getStore } from "@netlify/blobs";
 import { createHash, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
@@ -306,6 +308,47 @@ export default async (req, context) => {
     const blocked = (await admin.get("blocked", { type: "json" })) || { ips: [] };
     blocked.ips = blocked.ips.filter((x) => x.ip !== String(b.ip));
     await admin.setJSON("blocked", blocked);
+    return json({ ok: true });
+  }
+
+  // ---- bug reports (bug.mjs) ----
+  if (what === "bugs" && req.method === "GET") {
+    const store = getStore({ name: "bugs", consistency: "strong" });
+    const { blobs } = await store.list();
+    const list = [];
+    for (const { key } of blobs) {
+      if (key === "counter" || key === "public") continue;
+      const x = await store.get(key, { type: "json" });
+      if (x) list.push(x);
+    }
+    list.sort((a, b) => b.when - a.when);
+    return json({ bugs: list.slice(0, 300) });
+  }
+
+  if (what === "bug" && req.method === "POST") {
+    const store = getStore({ name: "bugs", consistency: "strong" });
+    const id = String(b.id || "");
+    if (!/^\d+-[0-9a-f]{8}$/.test(id)) return json({ error: "bad request" }, 400);
+    const x = await store.get(id, { type: "json" });
+    if (!x) return json({ error: "That report is gone." }, 404);
+    if (b.action === "delete") await store.delete(id);
+    else if (["show", "hide", "fixed", "open"].includes(b.action)) {
+      if (b.action === "show" || b.action === "hide") x.shown = b.action === "show";
+      else x.fixed = b.action === "fixed";
+      x.checked = true;
+      await store.setJSON(id, x);
+    }
+    else return json({ error: "bad request" }, 400);
+    // the public list (/api/bugs): the approved ones, without their error logs
+    const { blobs } = await store.list();
+    const pub = [];
+    for (const { key } of blobs) {
+      if (key === "counter" || key === "public") continue;
+      const y = await store.get(key, { type: "json" });
+      if (y && y.shown) pub.push({ num: y.num, when: y.when, kind: y.kind, text: y.text, where: y.where, fixed: !!y.fixed });
+    }
+    pub.sort((p, q) => q.when - p.when);
+    await store.setJSON("public", pub.slice(0, 300));
     return json({ ok: true });
   }
 

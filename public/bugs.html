@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nox bugs</title>
+<link rel="icon" href="/favicon.png">
+<style>
+body{font-family:system-ui,sans-serif;background:#1c1c1f;color:#ddd;max-width:680px;margin:48px auto;padding:0 16px;line-height:1.5}
+h1{color:#fff;margin:0 0 4px;font-size:34px}h2{color:#fff;font-size:19px;margin:0 0 8px}
+a{color:#f2c94c}.dim{color:#999}
+.card{background:#26262b;border:1px solid #34343a;padding:18px 20px;margin:14px 0}
+select,textarea{background:#2a2a30;color:#fff;border:1px solid #444;padding:8px 10px;font:inherit;font-size:15px;box-sizing:border-box}
+textarea{width:100%;height:90px;resize:vertical;margin:8px 0}
+button{background:#f2c94c;color:#1e2534;font-weight:600;border:0;padding:9px 18px;font-size:15px;cursor:pointer}
+button:disabled{opacity:.5;cursor:default}
+.msg{min-height:22px;margin-top:8px}.err{color:#e98a72}.ok{color:#8fd19e}
+.bug{border-top:1px solid #34343a;padding:12px 0}.bug:first-child{border-top:0}
+.who{color:#fff;font-weight:600}.tag{font-size:12px;padding:1px 7px;border:1px solid #555;margin-left:6px;color:#bbb}
+.tag.fixed{border-color:#38804a;color:#8fd19e}.text{margin-top:4px;white-space:pre-wrap;word-wrap:break-word}
+</style></head>
+<body>
+<p><a href="/">&larr; Nox</a></p>
+<h1>Bugs</h1>
+<p class="dim">Bugs people found in Nox. Everyone shows as Anonymous, and a report only shows up here after it's been checked.</p>
+
+<div class="card" id="report">
+  <h2>Report a bug</h2>
+  <div class="dim">You can also do this in the Nox app (Settings, Report a bug), which can send the errors from your last game.</div>
+  <p style="margin:12px 0 0">
+    <select id="kind">
+      <option value="">What kind?</option>
+      <option>Crash</option><option>Multiplayer</option><option>Graphics</option><option>Saves</option>
+      <option>Controls</option><option>Studio</option><option>Website</option><option>Other</option>
+    </select>
+  </p>
+  <textarea id="text" maxlength="400" placeholder="What happened? What were you doing when it happened?"></textarea>
+  <div class="dim" style="font-size:14px">Don't put your name, email or passwords in it.</div>
+  <p style="margin:12px 0 0"><button id="send">Send</button></p>
+  <div class="msg" id="msg"></div>
+</div>
+
+<div class="card">
+  <h2>Reported</h2>
+  <div id="list" class="dim">Loading...</div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+function load () {
+  fetch("/api/bugs").then((r) => r.json()).then((d) => {
+    $("list").classList.toggle("dim", !d.bugs.length);
+    $("list").innerHTML = d.bugs.length ? d.bugs.map((b) =>
+      `<div class="bug"><span class="who">Anonymous #${b.num}</span><span class="tag">${esc(b.kind)}</span>` +
+      `<span class="tag${b.fixed ? " fixed" : ""}">${b.fixed ? "Fixed" : "Open"}</span>` +
+      ` <span class="dim" style="font-size:13px">${esc(new Date(b.when).toLocaleDateString())}${b.where ? " &middot; " + esc(b.where) : ""}</span>` +
+      `<div class="text">${esc(b.text)}</div></div>`).join("")
+      : "Nothing yet.";
+  }).catch(() => { $("list").textContent = "Couldn't load the list."; });
+}
+
+$("send").onclick = async () => {
+  const m = $("msg");
+  m.className = "msg"; m.textContent = "";
+  if (!$("kind").value) { m.className = "msg err"; m.textContent = "Pick what kind of bug it is."; return; }
+  $("send").disabled = true;
+  try {
+    const r = await fetch("/api/bug", { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ kind: $("kind").value, text: $("text").value, where: "Website" }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || "Couldn't send it. Try again later.");
+    m.className = "msg ok";
+    m.textContent = `Sent, thanks. It's Anonymous #${d.num}, and shows up here once it's been checked.`;
+    $("text").value = ""; $("kind").value = "";
+  } catch (e) { m.className = "msg err"; m.textContent = e.message; }
+  $("send").disabled = false;
+};
+load();
+</script>
+</body></html>
