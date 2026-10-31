@@ -28,6 +28,7 @@ footer{margin:48px 0 20px;font-size:14px}
   <a href="#roblox">Coming from Roblox</a>
   <a href="#scripts">How scripts run</a>
   <a href="#services">Services</a>
+  <a href="#permissions">Permissions</a>
   <a href="#classes">Classes</a>
   <a href="#types">Datatypes</a>
   <a href="#examples">Examples</a>
@@ -133,10 +134,11 @@ end)</code></pre>
 <tr><td>ServerScripts</td><td>ServerScriptService</td><td>Actions</td><td>ContextActionService</td></tr>
 <tr><td>ServerOnly</td><td>ServerStorage</td><td>Cleanup</td><td>Debris</td></tr>
 <tr><td>Screens</td><td>StarterGui</td><td>Tags</td><td>CollectionService</td></tr>
-<tr><td>StartingTools</td><td>StarterPack</td><td>Web</td><td>HttpService (JSON only)</td></tr>
+<tr><td>StartingTools</td><td>StarterPack</td><td>Web</td><td>HttpService</td></tr>
 <tr><td>PlayerSetup</td><td>StarterPlayer</td><td>Prompts</td><td>ProximityPromptService</td></tr>
 <tr><td>Audio</td><td>SoundService</td><td>Pathfinding</td><td>PathfindingService</td></tr>
 <tr><td>Chat</td><td>TextChatService</td><td>Players, Teams</td><td>(same)</td></tr>
+<tr><td>Saves</td><td>DataStoreService</td><td>Links, Clipboard</td><td>(new in Nox)</td></tr>
 </table>
 
 <h3>Language differences</h3>
@@ -157,8 +159,9 @@ Note that <code>tick()</code> gives whole seconds; use <code>time()</code> or <c
 <h3>Other differences</h3>
 <ul>
   <li><b>Files, not asset IDs.</b> Sounds, images and meshes are files in your game folder: <code>sound.SoundId = "sounds/coin.wav"</code>.</li>
-  <li><b>No data saving yet.</b> There's no DataStore; <code>Saves</code> exists but does nothing yet.</li>
-  <li><b>No web requests</b> from game scripts. <code>Web:JSONEncode</code>/<code>JSONDecode</code> work.</li>
+  <li><b>Saving is on the player's device.</b> <code>Saves:GetDataStore(name)</code> works like DataStores, but the data
+      stays on the computer or phone that played (see <a href="#permissions">Permissions</a>).</li>
+  <li><b>Web requests need a permission</b> that players say yes to (see <a href="#permissions">Permissions</a>).</li>
   <li><b>One computer per game.</b> Each player runs the game's scripts on their own computer; Nox shares players' movement,
       avatars and chat. RemoteEvents work, but only on the same computer (FireServer reaches OnServerEvent locally).</li>
   <li><b>The character</b> is a Model with <code>Humanoid</code> and <code>HumanoidRootPart</code>. In <code>Touched</code>,
@@ -232,7 +235,12 @@ Put Sky, Atmosphere and post effects (Bloom, Blur, ColorCorrection, SunRays, Dep
 <table>
 <tr><td>Cleanup</td><td><code>:AddItem(instance, seconds)</code></td></tr>
 <tr><td>Tags</td><td><code>:AddTag</code>, <code>:RemoveTag</code>, <code>:HasTag</code>, <code>:GetTagged(tag)</code>, <code>:GetInstanceAddedSignal(tag)</code></td></tr>
-<tr><td>Web</td><td><code>:JSONEncode(t)</code>, <code>:JSONDecode(s)</code>, <code>:GenerateGUID()</code>, <code>:UrlEncode(s)</code></td></tr>
+<tr><td>Web</td><td><code>:JSONEncode(t)</code>, <code>:JSONDecode(s)</code>, <code>:GenerateGUID()</code>, <code>:UrlEncode(s)</code>;
+  <code>:GetAsync(url)</code>, <code>:PostAsync(url, text)</code>, <code>:RequestAsync({Url, Method, Body})</code> with the Internet permission</td></tr>
+<tr><td>Saves</td><td><code>:GetDataStore(name)</code>, then <code>:GetAsync(key)</code>, <code>:SetAsync(key, value)</code>,
+  <code>:UpdateAsync(key, fn)</code>, <code>:IncrementAsync(key, n)</code>, <code>:RemoveAsync(key)</code></td></tr>
+<tr><td>Links</td><td><code>:Open(url)</code>: asks the player, returns true if they opened it</td></tr>
+<tr><td>Clipboard</td><td><code>:Copy(text)</code></td></tr>
 <tr><td>Pathfinding</td><td><code>:CreatePath()</code>, then <code>path:ComputeAsync(a, b)</code>, <code>path:GetWaypoints()</code></td></tr>
 <tr><td>Screens</td><td><code>:SetCoreGuiEnabled(Enum.CoreGuiType.Chat, false)</code>, <code>:SetCore("SendNotification", {Title=..., Text=...})</code></td></tr>
 <tr><td>Chat</td><td><code>TextChannels.RBXGeneral:DisplaySystemMessage(text)</code>; TextChatCommand for /commands</td></tr>
@@ -240,6 +248,33 @@ Put Sky, Atmosphere and post effects (Bloom, Blur, ColorCorrection, SunRays, Dep
 <tr><td>Prompts</td><td>event <code>PromptTriggered(prompt, player)</code></td></tr>
 <tr><td>PlayerSetup</td><td>controls, built-in UI switches, window and export settings (also in File &gt; Settings)</td></tr>
 </table>
+
+<!-- ============================================================ -->
+<h2 id="permissions">Permissions</h2>
+<p>A game can't reach anything outside itself unless you turn it on in <b>File &gt; Settings &gt; Permissions</b>.
+Scripts can't change these settings.</p>
+<table>
+<tr><th>Permission</th><th>What it allows</th><th>Players asked?</th></tr>
+<tr><td>Save data</td><td><code>Saves</code>: up to 1 MB per game, kept on the player's device. On for new games.</td><td>No</td></tr>
+<tr><td>Internet</td><td><code>Web:GetAsync</code>, <code>PostAsync</code>, <code>RequestAsync</code>. Websites only (never the player's own
+computer or network), 60 requests a minute, answers up to 1 MB.</td><td>Yes</td></tr>
+<tr><td>Open web pages and copy text</td><td><code>Links:Open</code> and <code>Clipboard:Copy</code>. Each web page is also shown to the player
+before it opens.</td><td>Yes</td></tr>
+</table>
+<p>When an exported game starts, players see what it wants and can untick anything; the answer is kept for that game
+(delete <code>nox_permissions.txt</code> next to the game to be asked again). In the Nox app, players are asked each time
+they join. When you test with Play, everything you ticked is allowed, and test saves are kept apart from players' saves.</p>
+<p>If a player says no, the call errors with a message, so wrap it in <code>pcall</code>:</p>
+<pre><code>local Web = game:GetService("Web")
+local ok, body = pcall(function()
+  return Web:GetAsync("https://example.com/news.json")
+end)
+if ok then
+  local news = Web:JSONDecode(body)
+  print(news.title)
+else
+  print("No news: " .. body)
+end</code></pre>
 
 <!-- ============================================================ -->
 <h2 id="classes">Classes</h2>
@@ -321,6 +356,16 @@ coin.Touched:Connect(function(hit)
     coins.Value = coins.Value + 1
     coin:Destroy()
   end
+end)</code></pre>
+
+<h3>Saving coins between plays</h3>
+<pre><code>local store = game:GetService("Saves"):GetDataStore("Main")
+local player = game:GetService("Players").LocalPlayer
+local coins = player:WaitForChild("leaderstats"):WaitForChild("Coins")
+
+coins.Value = store:GetAsync("coins") or 0
+coins.Changed:Connect(function(value)
+  store:SetAsync("coins", value)
 end)</code></pre>
 
 <h3>A button on screen (LocalScript in a ScreenGui)</h3>
