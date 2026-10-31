@@ -264,6 +264,9 @@ computer or network), 60 requests a minute, answers up to 1 MB.</td><td>Yes</td>
 before it opens.</td><td>Yes</td></tr>
 <tr><td>Play online with other players</td><td><code>Multiplayer:Host</code> and <code>Join</code>. Players you play with can see your
 IP address.</td><td>Yes</td></tr>
+<tr><td>Direct connections</td><td>The <code>Net</code> service: TCP and UDP. Never the player's own computer or special addresses, never
+ports for email, remote desktop or databases; on the player's home network only ports 1024 and up, and not web ports.
+1 MB a second over TCP, 200 UDP packets a second, 16 connections.</td><td>Yes</td></tr>
 </table>
 <p>When an exported game starts, players see what it wants and can untick anything; the answer is kept for that game
 (on Windows, delete <code>nox_permissions.txt</code> in <code>%APPDATA%\Nox</code> to be asked again). In the Nox app, players are asked each time
@@ -341,6 +344,25 @@ end)</code></pre>
 <p>Never trust what a player sends: check it on the host, like above.</p>
 <p><b>Testing it:</b> <b>Test &gt; Play with 2 players</b> (or <b>2 Players</b> on the Test tab) opens two windows on your computer:
 Player1 hosts and Player2 joins. Studio's Output shows Player1's messages; press F9 in Player2's window for its own.</p>
+
+<h3>Your own multiplayer: TCP and UDP</h3>
+<p>For games that make multiplayer their own way, the <b>Net</b> service (with the <b>Direct connections</b> permission) gives
+plain connections. Players behind a router may need to forward the port to host.</p>
+<table>
+<tr><td><code>Net:ListenTCP(port)</code></td><td>a server: <code>.ConnectionAccepted(conn)</code>, <code>.Port</code>, <code>:Close()</code></td></tr>
+<tr><td><code>Net:ConnectTCP(host, port)</code></td><td>a connection (waits until it's made): <code>:Send(text)</code>, <code>.DataReceived(text)</code>,
+<code>.Closed</code>, <code>.Address</code>, <code>:Close()</code></td></tr>
+<tr><td><code>Net:OpenUDP(port)</code></td><td>packets: <code>:SendTo(address, port, text)</code>, <code>.PacketReceived(text, address, port)</code>, <code>.Port</code></td></tr>
+<tr><td><code>Net:Resolve("example.com")</code></td><td>the address as numbers, for SendTo</td></tr>
+</table>
+<p>TCP is a stream: one Send can arrive in pieces, or two together. End each message with a newline (or send its length first)
+and put the pieces back together.</p>
+<pre><code>local Net = game:GetService("Net")
+local server = Net:ListenTCP(30500)
+server.ConnectionAccepted:Connect(function(conn)
+  print("connected:", conn.Address)
+  conn.DataReceived:Connect(function(text) conn:Send("you said " .. text) end)
+end)</code></pre>
 
 <h3>Hosting and joining from your game</h3>
 <p>Games played in the Nox app are multiplayer already. An exported game (a Windows .exe, later Steam) can host and join
