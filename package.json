@@ -2,8 +2,8 @@
   "name": "nox-online",
   "private": true,
   "type": "module",
-  "description": "Nox: the list of games being hosted, and their join codes",
-  "dependencies": {
-    "@netlify/blobs": "^8.1.0"
+  "description": "Nox: the website, and the list of games being hosted (Cloudflare Workers)",
+  "devDependencies": {
+    "wrangler": "^4"
   }
 }

@@ -4,7 +4,7 @@
 // The code is only kept for a game in the list of games online, or a friends-only one:
 // an invite-only game's code stays with the people the host gave it to.
 
-import { getStore } from "@netlify/blobs";
+import { getStore } from "./store.mjs";
 import { badName } from "./names.mjs";
 
 const FRESH = 5 * 60 * 1000;

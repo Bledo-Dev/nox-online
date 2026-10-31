@@ -1,7 +1,7 @@
 // Nox admin: take games off the list, and block PCs from listing games.
 //
 // Signing in takes the username and password, then a 6-digit code emailed to the admin.
-// Everything secret is in Netlify's environment variables (never in this code):
+// Everything secret is in the Worker's variables and secrets on Cloudflare (never in this code):
 //   ADMIN_USER, ADMIN_PASS      the one login
 //   ADMIN_EMAIL                 where the code goes
 //   RESEND_API_KEY              the email service (resend.com, free plan)
@@ -33,7 +33,7 @@
 //   GET  /api/admin/bugs                             bug reports (anonymous), newest first
 //   POST /api/admin/bug      { id, action }          action: "show" (on /bugs.html), "hide", "fixed", "open", "delete"
 
-import { getStore } from "@netlify/blobs";
+import { getStore } from "../lib/store.mjs";
 import { createHash, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 import { strike, ban, unban, getStanding, isDevice } from "../lib/standing.mjs";
 import { nameInfo, freeName } from "../lib/names.mjs";
@@ -49,7 +49,7 @@ const json = (data, status = 200) =>
     headers: { "content-type": "application/json", "cache-control": "no-store" },
   });
 
-const env = (k) => (globalThis.Netlify?.env?.get?.(k) ?? process.env[k] ?? "");
+const env = (k) => String(globalThis.NOX_ENV?.[k] ?? globalThis.process?.env?.[k] ?? "");   // (Cloudflare: the Worker's variables and secrets)
 const hash = (s) => createHash("sha256").update(String(s)).digest("hex");
 // a game taken off the list stays off: its hosting session (token) is refused when it checks in
 async function remember (admin, tokens) {
@@ -73,7 +73,7 @@ async function sendCode (code) {
       from: "Nox <onboarding@resend.dev>",
       to: [env("ADMIN_EMAIL")],
       subject: `Nox admin code: ${code}`,
-      text: `Your Nox admin sign-in code is ${code}\n\nIt works once, for 10 minutes.\nIf you didn't just sign in, someone has your password: change ADMIN_PASS in Netlify.`,
+      text: `Your Nox admin sign-in code is ${code}\n\nIt works once, for 10 minutes.\nIf you didn't just sign in, someone has your password: change ADMIN_PASS in Cloudflare (your Worker, Settings, Variables and Secrets).`,
     }),
   });
   return r.ok;
@@ -88,7 +88,7 @@ export default async (req, context) => {
   if (req.method === "POST") { try { b = await req.json(); } catch { b = {}; } }
 
   if (!env("ADMIN_USER") || !env("ADMIN_PASS") || !env("ADMIN_EMAIL") || !env("RESEND_API_KEY"))
-    return json({ error: "The admin panel isn't set up: add the environment variables in Netlify." }, 503);
+    return json({ error: "The admin panel isn't set up: add the variables and secrets in Cloudflare (your Worker, Settings)." }, 503);
 
   // ---- signing in (with a lock after too many wrong tries) ----
   if (what === "login" || what === "verify") {

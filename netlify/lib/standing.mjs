@@ -9,7 +9,7 @@
 // or marked a report they made as false):
 //   1 a warning   2 one hour   3 one day   4 one week   5 banned for good
 
-import { getStore } from "@netlify/blobs";
+import { getStore } from "./store.mjs";
 import { createHash } from "node:crypto";
 
 const HOUR = 3600 * 1000, DAY = 24 * HOUR;
@@ -17,7 +17,7 @@ export const LADDER = [0, 0, HOUR, DAY, 7 * DAY];   // (by strike count; 5 and u
 export const NOT_TRUSTED = "You are not trusted to play Nox right now. Try again later.";
 export const BANNED = "You are not trusted to play Nox anymore.";
 
-const env = (k) => (globalThis.Netlify?.env?.get?.(k) ?? process.env[k] ?? "");
+const env = (k) => String(globalThis.NOX_ENV?.[k] ?? globalThis.process?.env?.[k] ?? "");   // (Cloudflare: the Worker's variables and secrets)
 export const hashIp = (ip) => createHash("sha256").update((env("NOX_SALT") || env("ADMIN_PASS") || "nox") + "|" + ip).digest("hex").slice(0, 32);
 export const isDevice = (s) => /^[0-9a-f]{32}$/.test(s) && !/^0+$/.test(s);   // (all zeros: no ID was set)
 

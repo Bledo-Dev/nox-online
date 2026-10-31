@@ -17,7 +17,7 @@
 //
 // Everything is kept in Netlify Blobs (store "games", one entry per code).
 
-import { getStore } from "@netlify/blobs";
+import { getStore } from "../lib/store.mjs";
 import { check } from "../lib/standing.mjs";
 import { checkName } from "../lib/names.mjs";
 import { setPlaying } from "../lib/presence.mjs";

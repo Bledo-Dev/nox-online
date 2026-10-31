@@ -14,7 +14,7 @@
 //   store "friends":   f-<username, small letters>  { name, friends: [...], incoming: [...], outgoing: [...] }
 //   store "presence":  p-<username, small letters>  { game, code, at }   (only friends see it; 5 minutes old = gone)
 
-import { getStore } from "@netlify/blobs";
+import { getStore } from "../lib/store.mjs";
 import { whoIs, realName, validName } from "../lib/names.mjs";
 import { check } from "../lib/standing.mjs";
 import { allow } from "../lib/limits.mjs";

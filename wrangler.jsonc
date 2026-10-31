@@ -1,0 +1,20 @@
+// Nox online on Cloudflare (free plan). Cloudflare builds it from GitHub with: npx wrangler deploy
+{
+  "name": "nox-play",
+  "main": "worker.mjs",
+  "compatibility_date": "2025-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  // the website's pages and downloads: served as they are; /api/... goes to the Worker
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  },
+  // where usernames, games, reports, bans and bug reports are kept
+  "d1_databases": [
+    { "binding": "DB", "database_name": "nox", "database_id": "6642ab25-13c8-42db-936a-3a35d1fc1a18" }
+  ],
+  "observability": { "enabled": true },
+  // (the secrets ADMIN_USER, ADMIN_PASS, ADMIN_EMAIL, RESEND_API_KEY are set on Cloudflare, not here)
+  "keep_vars": true
+}

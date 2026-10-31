@@ -11,7 +11,7 @@
 // Netlify Blobs, store "bugs":  <id> { id, num, when, kind, text, log, where, version, shown, fixed }
 //                               "counter" { n }   "public" [ ...approved, newest first ]
 
-import { getStore } from "@netlify/blobs";
+import { getStore } from "../lib/store.mjs";
 import { randomBytes } from "node:crypto";
 import { hashIp, isDevice, getStanding } from "../lib/standing.mjs";
 import { allow } from "../lib/limits.mjs";

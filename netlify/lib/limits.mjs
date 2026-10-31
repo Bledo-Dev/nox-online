@@ -1,6 +1,6 @@
 // Nox: simple limits so nobody can flood the website (counts per hour, in Netlify Blobs).
 
-import { getStore } from "@netlify/blobs";
+import { getStore } from "./store.mjs";
 
 // one more for each of these keys this hour; false if any is already at max
 export async function allow (keys, max) {

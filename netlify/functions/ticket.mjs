@@ -11,7 +11,7 @@
 // A ticket starts with the hour it was made (8 hex digits), so old ones can be cleared
 // by their names alone.
 
-import { getStore } from "@netlify/blobs";
+import { getStore } from "../lib/store.mjs";
 import { randomBytes } from "node:crypto";
 import { whoIs } from "../lib/names.mjs";
 import { check, hashIp, isDevice } from "../lib/standing.mjs";

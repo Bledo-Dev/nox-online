@@ -9,7 +9,7 @@
 // nox_name.txt next to it). Device IDs are seen by other players, so only the key can use
 // a device's username.
 
-import { getStore } from "@netlify/blobs";
+import { getStore } from "./store.mjs";
 import { createHash, randomBytes } from "node:crypto";
 import { check, hashIp, isDevice } from "./standing.mjs";
 import { allow } from "./limits.mjs";

@@ -10,7 +10,7 @@
 // Limits, so nobody can flood it: 8 reports an hour from one device or one address,
 // and one report a day from the same person about the same player.
 
-import { getStore } from "@netlify/blobs";
+import { getStore } from "../lib/store.mjs";
 import { randomBytes } from "node:crypto";
 import { check, hashIp, isDevice } from "../lib/standing.mjs";
 
