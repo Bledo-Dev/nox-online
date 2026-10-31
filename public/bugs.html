@@ -65,7 +65,7 @@ $("send").onclick = async () => {
   $("send").disabled = true;
   try {
     const r = await fetch("/api/bug", { method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ kind: $("kind").value, text: $("text").value, where: "Website" }) });
+      body: JSON.stringify({ kind: $("kind").value, text: $("text").value, where: "Website", version: "0.9" }) });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.error || "Couldn't send it. Try again later.");
     m.className = "msg ok";
