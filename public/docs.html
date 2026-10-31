@@ -120,6 +120,19 @@ end)</code></pre>
 
 <div class="note">Tip: the 3D Model view (Model tab, <b>3D Model</b>) lets you make your own meshes, like guns, props or characters, without leaving Studio.</div>
 
+<h3>Android phones</h3>
+<p><b>File &gt; Export game &gt; Android app (.apk)</b> makes your game a phone app (exports/YourGame.apk). It uses the name,
+icon and version above it, plus:</p>
+<ul>
+  <li><b>Package name</b>: the app's ID, like <code>com.yourname.yourgame</code>. Pick it once and never change it: phones see
+      an app with a new package name as a different app.</li>
+  <li><b>Version code</b>: a number that goes up by one with each export. Phones only install an update over an older version.</li>
+</ul>
+<p>The first time, Studio makes <b>your signing key</b> (<code>nox_android_key.txt</code>, in <code>%APPDATA%\Nox</code> on Windows)
+and says so in the Output. Keep a copy of it somewhere safe and never share it: updates of your apps must be signed with the same
+key, or phones won't install them over the old version. To try the app, copy the .apk to a phone and open it (the phone may ask
+to allow installing apps from that place). For the Google Play Store, which wants a different format (.aab), that's coming later.</p>
+
 <!-- ============================================================ -->
 <h2 id="roblox">Coming from Roblox</h2>
 <p>Most of what you know carries over: <code>Instance.new</code>, <code>:Connect</code>, <code>FindFirstChild</code>,
