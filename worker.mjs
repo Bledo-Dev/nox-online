@@ -10,12 +10,13 @@ import admin from "./netlify/functions/admin.mjs";
 import report from "./netlify/functions/report.mjs";
 import name from "./netlify/functions/name.mjs";
 import standing from "./netlify/functions/standing.mjs";
+import published from "./netlify/functions/published.mjs";
 import { useDb, tidy } from "./netlify/lib/store.mjs";
 
 const ROUTES = {
   "/api/host": games, "/api/games": games, "/api/code": games, "/api/thumb": games,
   "/api/friends": friends, "/api/ticket": ticket, "/api/bug": bug, "/api/bugs": bug,
-  "/api/report": report, "/api/name": name, "/api/standing": standing,
+  "/api/report": report, "/api/name": name, "/api/standing": standing, "/api/published": published,
 };
 
 const notFound = () => new Response(JSON.stringify({ error: "not found" }), {

@@ -22,7 +22,7 @@ details{margin-top:4px}summary{cursor:pointer;color:#999}.chat{background:#23232
 </style></head>
 <body>
 <h1>Nox admin</h1>
-<p class="dim">Take games off the list, look at reports and bug reports, time out and ban players, and stop a PC from listing games.</p>
+<p class="dim">Publish games, take games off the list, look at reports and bug reports, time out and ban players, and stop a PC from listing games.</p>
 
 <div id="login">
   <label>Username<input id="user" autocomplete="username"></label>
@@ -41,11 +41,29 @@ details{margin-top:4px}summary{cursor:pointer;color:#999}.chat{background:#23232
 <div id="panel" class="hide">
   <div class="bar">
     <button id="refresh">Refresh</button>
-    <button class="bad" id="clear">Delete all games</button>
+    <button class="bad" id="clear">Delete all listed games</button>
     <span style="flex:1"></span>
     <button id="logout">Sign out</button>
   </div>
   <p class="err" id="panelErr"></p>
+  <h2>Published games <span class="dim" id="pcount"></span></h2>
+  <p class="dim">Games kept on the website until you delete them: they're in the Nox app's Games list for anyone to play.
+    Save the game in Studio with File &gt; Save to File (without a password), then pick that .noxgame file here.</p>
+  <div class="bar">
+    <input id="pfile" type="file" accept=".noxgame" style="width:auto;margin:0">
+  </div>
+  <div class="bar">
+    <input id="pname" placeholder="Name" maxlength="48" style="width:220px;margin:0">
+    <input id="pcreator" placeholder="Made by (username)" maxlength="24" style="width:170px;margin:0">
+  </div>
+  <div class="bar">
+    <input id="pdesc" placeholder="Description" maxlength="200" style="width:400px;margin:0">
+    <button class="go" id="pgo">Publish</button>
+    <span id="pmsg" class="dim"></span>
+  </div>
+  <table><thead><tr><th>Game</th><th>Made by</th><th class="wide">Size</th><th class="wide">Published</th><th></th></tr></thead>
+  <tbody id="published"></tbody></table>
+
   <h2>Games listed <span class="dim" id="count"></span></h2>
   <table><thead><tr><th>Game</th><th>Host</th><th>Players</th><th>Code</th><th class="wide">Started</th><th></th></tr></thead>
   <tbody id="games"></tbody></table>
@@ -165,9 +183,19 @@ async function loadShot (img) {
   } catch (e) {}
 }
 
+const mb = (n) => n >= 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB";
+const day = (t) => new Date(t).toLocaleDateString();
+
 async function load () {
   $("panelErr").textContent = "";
   try {
+    const pg = await call("published");
+    $("pcount").textContent = "(" + pg.games.length + ")";
+    $("published").innerHTML = pg.games.length ? pg.games.map((x) =>
+      `<tr><td>${esc(x.name)}${x.desc ? `<br><span class="note">${esc(x.desc)}</span>` : ""}</td><td>${esc(x.creator)}</td>` +
+      `<td class="wide">${mb(x.size)}</td><td class="wide dim">${day(x.when)}</td>` +
+      `<td><button class="bad" data-unpub="${esc(x.id)}" data-pname="${esc(x.name)}">Delete</button></td></tr>`).join("")
+      : `<tr><td colspan="5" class="dim">Nothing published yet.</td></tr>`;
     const g = await call("games");
     $("count").textContent = "(" + g.games.length + ")";
     $("games").innerHTML = g.games.length ? g.games.map((x) =>
@@ -266,10 +294,51 @@ document.addEventListener("click", async (e) => {
       await call("bug", { id: t.dataset.bug, action: t.dataset.act }); load();
     }
     if (t.dataset.unflag) { await call("unflag", { device: t.dataset.unflag }); load(); }
+    if (t.dataset.unpub) {
+      if (!confirm("Delete " + t.dataset.pname + "? It leaves the Nox app's Games list (people playing it right now can finish).")) return;
+      await call("unpublish", { id: t.dataset.unpub }); load();
+    }
     if (t.dataset.untrust) { if (confirm("Remove this trusted device?")) { await call("untrust", { device: t.dataset.untrust }); load(); } }
   } catch (err) { $("panelErr").textContent = err.message; }
 });
 $("refresh").onclick = load;
+
+// publishing: the file goes up in parts (each one a request), then it's in the list
+try { $("pcreator").value = localStorage.getItem("noxCreator") || "Nox_dev"; } catch (e) { $("pcreator").value = "Nox_dev"; }
+$("pfile").onchange = () => {
+  const f = $("pfile").files[0];
+  if (f && !$("pname").value.trim()) $("pname").value = f.name.replace(/\.noxgame$/i, "");
+};
+const b64 = (blob) => new Promise((ok, bad) => {
+  const r = new FileReader();
+  r.onload = () => ok(String(r.result).replace(/^data:[^,]*,/, ""));
+  r.onerror = () => bad(new Error("Couldn't read the file."));
+  r.readAsDataURL(blob);
+});
+$("pgo").onclick = async () => {
+  const f = $("pfile").files[0], msg = $("pmsg");
+  msg.textContent = "";
+  if (!f) { msg.textContent = "Pick a .noxgame file first."; return; }
+  const head = new Uint8Array(await f.slice(0, 8).arrayBuffer());
+  const text = String.fromCharCode(...head);
+  if (text === "NOXLOCK1") { msg.textContent = "This file has a password. Save it again in Studio without one, then publish that."; return; }
+  if (!text.startsWith("PK")) { msg.textContent = "That isn't a Nox game file (.noxgame)."; return; }
+  try { localStorage.setItem("noxCreator", $("pcreator").value.trim()); } catch (e) {}
+  $("pgo").disabled = true;
+  try {
+    const up = await call("publish", { name: $("pname").value, desc: $("pdesc").value, creator: $("pcreator").value, size: f.size });
+    const parts = Math.ceil(f.size / up.part);
+    for (let i = 0; i < parts; i++) {
+      msg.textContent = "Uploading... " + Math.round(i / parts * 100) + "%";
+      await call("pubpart", { id: up.id, i, data: await b64(f.slice(i * up.part, (i + 1) * up.part)) });
+    }
+    await call("pubdone", { id: up.id });
+    msg.textContent = "Published.";
+    $("pfile").value = ""; $("pname").value = ""; $("pdesc").value = "";
+    load();
+  } catch (e) { msg.textContent = e.message; }
+  $("pgo").disabled = false;
+};
 $("nlook").onclick = async () => {
   $("nres").innerHTML = "";
   try {

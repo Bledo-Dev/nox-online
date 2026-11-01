@@ -32,11 +32,17 @@
 //   POST /api/admin/logout
 //   GET  /api/admin/bugs                             bug reports (anonymous), newest first
 //   POST /api/admin/bug      { id, action }          action: "show" (on /bugs.html), "hide", "fixed", "open", "delete"
+//   GET  /api/admin/published                        the published games (published.mjs)
+//   POST /api/admin/publish  { name, desc, creator, size }   -> { id, part }   a new upload: then each part,
+//   POST /api/admin/pubpart  { id, i, data }         (data: base64, 'part' bytes each), in order,
+//   POST /api/admin/pubdone  { id }                  and it's in the list
+//   POST /api/admin/unpublish { id }                 deleted
 
 import { getStore } from "../lib/store.mjs";
 import { createHash, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 import { strike, ban, unban, getStanding, isDevice } from "../lib/standing.mjs";
 import { nameInfo, freeName } from "../lib/names.mjs";
+import { PART, MAX_SIZE, isId } from "./published.mjs";
 
 const MAX_FAILS = 5;                 // wrong logins (or codes) before a lock
 const LOCK_MS = 15 * 60 * 1000;      // how long the lock lasts
@@ -350,6 +356,69 @@ export default async (req, context) => {
     pub.sort((p, q) => q.when - p.when);
     await store.setJSON("public", pub.slice(0, 300));
     return json({ ok: true });
+  }
+
+  // ---- published games (published.mjs) ----
+  if (["published", "publish", "pubpart", "pubdone", "unpublish"].includes(what)) {
+    const store = getStore({ name: "published", consistency: "strong" });
+    const clean = (s, max) => String(s ?? "").replace(/[\u0000-\u001f]/g, " ").trim().slice(0, max);
+    const list = (await store.get("list", { type: "json" })) || [];
+    const dropParts = async (id) => {
+      for (const { key } of (await store.list({ prefix: `c-${id}-` })).blobs) await store.delete(key);
+    };
+    if (what === "published" && req.method === "GET") return json({ games: list });
+    if (req.method !== "POST") return json({ error: "not found" }, 404);
+    if (what === "publish") {
+      const size = Number(b.size);
+      const name = clean(b.name, 48), creator = clean(b.creator, 24);
+      if (!name) return json({ error: "The game needs a name." }, 400);
+      if (!creator) return json({ error: "Who made it? (a username)" }, 400);
+      if (!Number.isInteger(size) || size < 22) return json({ error: "That file is empty." }, 400);
+      if (size > MAX_SIZE) return json({ error: `That file is too big (${Math.round(MAX_SIZE / 1048576)} MB at most).` }, 400);
+      for (const { key } of (await store.list({ prefix: "up-" })).blobs) {   // (unfinished uploads over a day old go)
+        const u = await store.get(key, { type: "json" });
+        if (!u || Date.now() - u.when > 24 * 3600 * 1000) { await dropParts(key.slice(3)); await store.delete(key); }
+      }
+      const id = randomBytes(6).toString("hex");
+      await store.setJSON(`up-${id}`, { id, name, desc: clean(b.desc, 200), creator, size, parts: Math.ceil(size / PART), got: 0, bytes: 0, when: Date.now() });
+      return json({ id, part: PART });
+    }
+    if (!isId(b.id)) return json({ error: "bad request" }, 400);
+    if (what === "unpublish") {
+      await dropParts(b.id);
+      await store.delete(`up-${b.id}`);
+      await store.setJSON("list", list.filter((g) => g.id !== b.id));
+      return json({ ok: true });
+    }
+    const up = await store.get(`up-${b.id}`, { type: "json" });
+    if (!up) return json({ error: "That upload ran out. Start it again." }, 404);
+    if (what === "pubpart") {
+      const data = String(b.data ?? "");
+      if (b.i !== up.got) return json({ error: "A part came out of order. Start the upload again." }, 400);
+      if (!data || data.length % 4 || data.length > Math.ceil(PART / 3) * 4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(data))
+        return json({ error: "A part of the file was damaged on the way. Try again." }, 400);
+      const bytes = data.length / 4 * 3 - (data.endsWith("==") ? 2 : data.endsWith("=") ? 1 : 0);
+      if (up.got < up.parts - 1 && bytes !== PART) return json({ error: "A part of the file was damaged on the way. Try again." }, 400);
+      if (up.got === 0) {   // the file's start: a game file (a zip), and not password-locked
+        const head = Buffer.from(data.slice(0, 12), "base64").toString("latin1");
+        if (head.startsWith("NOXLOCK1")) {
+          await store.delete(`up-${b.id}`);
+          return json({ error: "This game file has a password. Save it again in Studio without one (File > Save to File), then publish that." }, 400);
+        }
+        if (!head.startsWith("PK\u0003\u0004")) { await store.delete(`up-${b.id}`); return json({ error: "That isn't a Nox game file (.noxgame)." }, 400); }
+      }
+      await store.set(`c-${b.id}-${up.got}`, data);
+      up.got += 1; up.bytes += bytes;
+      await store.setJSON(`up-${b.id}`, up);
+      return json({ ok: true, got: up.got, parts: up.parts });
+    }
+    if (what === "pubdone") {
+      if (up.got !== up.parts || up.bytes !== up.size) return json({ error: "Not all of the file got here. Start the upload again." }, 400);
+      const game = { id: up.id, name: up.name, desc: up.desc, creator: up.creator, size: up.size, parts: up.parts, when: Date.now() };
+      await store.setJSON("list", [game, ...list.filter((g) => g.id !== up.id)]);
+      await store.delete(`up-${b.id}`);
+      return json({ ok: true, game });
+    }
   }
 
   return json({ error: "not found" }, 404);

@@ -4,7 +4,7 @@
 // "this code = this game, at this address" for a few minutes at a time.
 //
 //   POST /api/host    a host checks in (every 2 minutes while hosting)
-//                     { name, game, players, max, port, ip?, url?, token?, code?, stop?, device? }
+//                     { name, game, players, max, port, ip?, url?, token?, code?, stop?, device?, pub? }
 //                     (url: a host that can't let players in directly comes through
 //                      Cloudflare's tunnel, wss://....trycloudflare.com)
 //                     -> { code, token, ip, port }
@@ -43,7 +43,7 @@ const newToken = () => Array.from({ length: 24 }, () => ALPHA[Math.floor(Math.ra
 const pub = (g) => ({
   code: g.code, game: g.game, host: g.name, players: g.players, max: g.max,
   ip: g.ip, port: g.port, url: g.url || "", version: g.version,
-  desc: g.desc || "", genre: g.genre || "", thumb: !!g.thumb,
+  desc: g.desc || "", genre: g.genre || "", thumb: !!g.thumb, pub: g.pub || "",
 });
 const isTunnel = (s) => /^wss:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(s);
 // timed out or banned: refused, with what to show the player
@@ -129,6 +129,7 @@ export default async (req, context) => {
       version: Number(b.version) | 0 || VERSION,
       desc: clean(b.desc, 120),
       genre: GENRES.includes(b.genre) ? b.genre : "",
+      pub: /^[0-9a-f]{12}$/.test(String(b.pub ?? "")) ? String(b.pub) : "",   // (a published game: its id, so players join this one)
       thumb: !!(old && old.thumb),
       private: !!b.private,   // (invite-only or friends-only: not in the list; joined with its code)
       friends: !!b.friends,   // (friends-only: the host's friends see its code)
